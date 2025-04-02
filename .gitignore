@@ -32,8 +32,3 @@ ENV/
 # OS specific files
 .DS_Store
 Thumbs.db 
-
-Data/TotalSmilesTogether.pickle
-Data/molecular_formulas.csv
-Data/SmilesOri_FirstAlldatabase.smiles
-Data/guacamol_v1_train.smiles
