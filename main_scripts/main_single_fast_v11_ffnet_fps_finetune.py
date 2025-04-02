@@ -3,176 +3,22 @@ from lib_functions.config import *
 
 from lib_functions.models import GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2, GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2_morgan_finetune_2
 from lib_functions.losses import loss_func_vs_inicio
-from lib_functions.data_preparation_utils import embed_edges_with_cycle_sizes_norm, embed_edges_manuel
-from lib_functions.data_preparation_utils import calculate_2d_distances_ordered, embed_graph_nodes_norm
-from lib_functions.adjacency_utils import generate_mask2
+from lib_functions.data_preparation_utils import compute_features_fps, save_plot_data
+from lib_functions.adjacency_utils import generate_mask2, connected_double_edge_swap, nx_to_rdkit
+from lib_functions.data_preparation_utils import generate_swap_tensors_optimized
 
 from lib_functions.data_loader import build_dataset_alejandro
 
 import random 
-
 import os
-
-from lib_functions.adjacency_utils import connected_double_edge_swap
-from lib_functions.adjacency_utils import nx_to_rdkit
 from copy import deepcopy
-
+import concurrent.futures
+import itertools
+import json
+import gc 
+from rdkit.Chem import AllChem
 from multiprocessing import Pool
 
-import itertools
-
-import concurrent.futures
-
-import json
-
-import gc 
-
-from rdkit.Chem import AllChem
-
-
-def calculate_global_probabilities_vectorized(quadruplet_probabilities, final_mask_q):
-    
-    # Sum over the last two dimensions to aggregate probabilities for each pair (i, j)
-    global_break_probabilities = quadruplet_probabilities.sum(dim=[1, 2])
-    global_make_probabilities = quadruplet_probabilities.sum(dim=[1, 3])
-    counts_break = final_mask_q.sum([1,2])
-    counts_make = final_mask_q.sum([1,3])
-    counts_break[counts_break == 0] = 1 # para impedir que sea infinito, pero realmente nunca sería
-    counts_make[counts_make == 0] = 1 
-    
-    global_break_probabilities =  global_break_probabilities/counts_break
-    global_make_probabilities =  global_make_probabilities/counts_make
-
-    
-
-    return global_break_probabilities, global_make_probabilities
-
-def quadruplet_probability_task(args):
-    i, j, k, l, pairs_break, pairs_make, masked_pairs_break = args
-    if i != k and i != l and j != k and k != l:
-        P_remove_ij = masked_pairs_break[i, j].item()
-        P_remove_kl = masked_pairs_break[k, l].item()
-        P_add_ik = pairs_make[i, k].item()
-        P_add_jl = pairs_make[j, l].item()
-
-        return i, j, k, l, P_remove_ij * P_remove_kl * P_add_ik * P_add_jl
-    return None
-
-def calculate_quadruplet_probabilities(pairs_break, pairs_make, adjacency_matrix):
-    num_nodes = MAX_ATOM  # Assuming a graph with 35 nodes
-    quadruplet_probabilities = torch.zeros((num_nodes, num_nodes, num_nodes, num_nodes))
-
-    
-    pairs_break = torch.sigmoid(pairs_break.squeeze(0))
-    pairs_make = torch.sigmoid(pairs_make.squeeze(0))
-
-    pairs_break = pairs_break.detach().cpu()
-    pairs_make = pairs_make.detach().cpu()
-    # Create a mask where adjacency_matrix is not 0
-    # adjacency_matrix = torch.tensor(adjacency_matrix)
-    mask = (adjacency_matrix != 0).cpu()
-
-    # Apply the mask to pairs_break
-    masked_pairs_break = pairs_break * mask.float()
-
-    # Loop only over edges that exist in the graph
-    start2=  datetime.now()
-    enlaces_des = torch.nonzero(masked_pairs_break).tolist()
-    tasks = [(i, j, k, l, pairs_break, pairs_make, masked_pairs_break) 
-             for (i, j), (k, l) in itertools.product(enlaces_des, repeat=2)]
-
-    results = pool.map(quadruplet_probability_task, tasks)
-
-    
-
-    for result in results:
-        if result:
-            i, j, k, l, probability = result
-            quadruplet_probabilities[i, j, k, l] = probability
-
-    
-    return quadruplet_probabilities
-
-def generate_swap_tensors(final_swaps, num_nodes=MAX_ATOM):
-    swap_tensors = []
-
-    for swap in final_swaps:
-        # Initialize an empty tensor for this swap
-        swap_tensor = torch.zeros((num_nodes, num_nodes, num_nodes, num_nodes))
-
-        # Unpack the swap indices
-        u, v, x, y = swap
-
-        # Set the corresponding indices to 1
-        swap_tensor[u, x, v, y] = 1
-        swap_tensor[x, u, y, v] = 1
-        swap_tensor[v, y, u, x] = 1
-        swap_tensor[y, v, x, u] = 1
-
-        # Add the tensor to the list
-        swap_tensors.append(swap_tensor)
-
-    return swap_tensors
-
-def generate_swap_tensors_optimized(final_swaps, num_nodes=MAX_ATOM, device=device):
-    # Preallocate tensor on the GPU (if using GPU)
-    all_swaps_tensor = torch.zeros((len(final_swaps), num_nodes, num_nodes, num_nodes, num_nodes), device=device)
-
-    for idx, swap in enumerate(final_swaps):
-        u, v, x, y = swap
-
-        # Perform operations directly in the preallocated tensor
-        all_swaps_tensor[idx, u, x, v, y] = 1
-        all_swaps_tensor[idx, x, u, y, v] = 1
-        all_swaps_tensor[idx, v, y, u, x] = 1
-        all_swaps_tensor[idx, y, v, x, u] = 1
-
-    # Since all operations were performed on GPU, no need for additional .to(device)
-    return all_swaps_tensor
-
-def genera_intermedio(graph, deshacer_l):
-    dk = [n for n, d in graph.degree()]
-    for d in deshacer_l:
-        # print("xxxxxxxx")
-        u = dk[d[0][0]]
-        v = dk[d[0][1]]
-        x = dk[d[1][0]]
-        y = dk[d[1][1]]
-        graph.remove_edge(u, v)
-        graph.remove_edge(x, y)
-        graph.add_edge(u, x)
-        graph.add_edge(v, y)
-    return graph
-        # u = dk[d[
-def compute_features(graph, num, deshacer_l):
-
-    grafo_i = genera_intermedio(graph,deshacer_l)
-    # print("1")
-    ruido, _, natoms = embed_edges_manuel(grafo_i, list(grafo_i.nodes()))
-    # print("2")
-    gemb, nemb, distances = embed_graph_nodes_norm(grafo_i)
-    # print("3")
-    edge_index, edge_attr = embed_edges_with_cycle_sizes_norm(grafo_i)
-    # print(edge_index, edge_attr)
-    # print("4")
-    dosd_positions = calculate_2d_distances_ordered(grafo_i, list(grafo_i.nodes())) # se deberia de añadir al distances
-    # print(dosd_positions)
-    mol = nx_to_rdkit(grafo_i, False)
-    fingerprint = AllChem.GetMorganFingerprintAsBitVect(mol, radius=3)
-    fingerprint = list(fingerprint)
-    
-    del(grafo_i)
-#     feats_add = embed_edges_with_all_features_add(graph)
-    
-#     print("5")
-#     feats_rem = embed_edges_with_all_features_remove(graph)
-#     print("6")
-    return ruido, gemb, nemb, distances, edge_index, edge_attr, natoms, num, dosd_positions, fingerprint
-
-# Define a function to save plot data to a JSON file
-def save_plot_data(data, filename):
-    with open(filename, 'w') as f:
-        json.dump(data, f)
 
 def initialize_finetune_model(pretrained_model_path, device):
     # Initialize the Morgan-enhanced model
@@ -196,6 +42,7 @@ def initialize_finetune_model(pretrained_model_path, device):
     finetune_model.load_state_dict(finetune_state_dict)
     
     return finetune_model
+
 
 def initialize_optimizers(model):
     # Separate parameters: pre-trained and new
@@ -330,7 +177,7 @@ def main(train_dl, test_dl, model, checkpoint, executor, slice, epoch, optimizer
 
                 start = datetime.now()
                 # Submit tasks
-                futures = [executor.submit(compute_features, train_graph_b[count], num, rem ) for num, rem  in enumerate(rem_acc)]
+                futures = [executor.submit(compute_features_fps, train_graph_b[count], num, rem ) for num, rem  in enumerate(rem_acc)]
 
                 # results = []
                 # num_e = 0
@@ -785,7 +632,7 @@ if __name__ == "__main__":
 
     # Convertir la fecha al formato deseado
     # date_str = current_date.strftime('%y%m%d')  + "only_quads"
-    date_str = "241213_allmolecules_ffnet_fps_finetune"
+    date_str = "Prueba_Finetune_ffnet_fps"
     
     # Crear directorios si no existen
     files_dir = os.path.join("files", date_str)

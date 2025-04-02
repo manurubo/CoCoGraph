@@ -1,5 +1,5 @@
 from lib_functions.config import *
-from lib_functions.adjacency_utils import pad_adjs, count_bond_types
+from lib_functions.adjacency_utils import  pad_adjs, count_bond_types
 import numpy as np
 import networkx as nx
 from rdkit import Chem
@@ -11,6 +11,9 @@ import scipy
 
 from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')
+
+from lib_functions.adjacency_utils import genera_intermedio
+
 
 
 # Convert rdkit molecule to graph
@@ -447,4 +450,140 @@ def count_cycles_by_size(graph, max_size=14):
     # print(cycle_counts)
     return cycle_counts
 
+def compute_features(graph, num, deshacer_l):
+    """
+    Computes features for a graph after applying swaps.
+    
+    Args:
+        graph: Input graph
+        num: Index number
+        deshacer_l: List of tuples containing edges to swap
+        
+    Returns:
+        Tuple containing various features of the graph
+    """
+    
+    grafo_i = genera_intermedio(graph, deshacer_l)
+    ruido, _, natoms = embed_edges_manuel(grafo_i, list(grafo_i.nodes()))
+    gemb, nemb, distances = embed_graph_nodes_norm(grafo_i)
+    edge_index, edge_attr = embed_edges_with_cycle_sizes_norm(grafo_i)
+    dosd_positions = calculate_2d_distances_ordered(grafo_i, list(grafo_i.nodes()))
+    
+    del(grafo_i)
+    return ruido, gemb, nemb, distances, edge_index, edge_attr, natoms, num, dosd_positions
 
+def compute_features_cero(grafo_i):
+    """
+    Computes features for a graph without applying swaps.
+    
+    Args:
+        grafo_i: Input graph
+        
+    Returns:
+        Tuple containing various features of the graph
+    """
+    ruido, _, natoms = embed_edges_manuel(grafo_i, list(grafo_i.nodes()))
+    gemb, nemb, distances = embed_graph_nodes_norm(grafo_i)
+    edge_index, edge_attr = embed_edges_with_cycle_sizes_norm(grafo_i)
+    dosd_positions = calculate_2d_distances_ordered(grafo_i, list(grafo_i.nodes()))
+    
+    return ruido, gemb, nemb, distances, edge_index, edge_attr, natoms, 0, dosd_positions
+
+def compute_features_timepred(graph, num, deshacer_l):
+    """
+    Computes time prediction features for a graph after applying swaps.
+    
+    Args:
+        graph: Input graph
+        num: Index number
+        deshacer_l: List of tuples containing edges to swap
+        
+    Returns:
+        Graph node embeddings
+    """
+    from lib_functions.adjacency_utils import genera_intermedio
+    
+    grafo_i = genera_intermedio(graph, deshacer_l)
+    gemb = embed_graph_nodes_norm_timepred(grafo_i)
+    
+    del(grafo_i)
+    return gemb
+
+def save_plot_data(data, filename):
+    """
+    Saves plot data to a JSON file.
+    
+    Args:
+        data: The data to save
+        filename: Path to the output file
+    """
+    import json
+    with open(filename, 'w') as f:
+        json.dump(data, f)
+
+def generate_swap_tensors_optimized(final_swaps, num_nodes=MAX_ATOM, device=device):
+    """
+    Generate a pre-allocated tensor of swaps (GPU optimized version).
+    
+    Args:
+        final_swaps: List of tuples (u, v, x, y) representing swaps
+        num_nodes: Number of nodes in the graph
+        device: Device to allocate tensor on (CPU or GPU)
+        
+    Returns:
+        Tensor with shape [len(final_swaps), num_nodes, num_nodes, num_nodes, num_nodes]
+    """
+    # Preallocate tensor on the specified device
+    all_swaps_tensor = torch.zeros((len(final_swaps), num_nodes, num_nodes, num_nodes, num_nodes), device=device)
+
+    for idx, swap in enumerate(final_swaps):
+        u, v, x, y = swap
+
+        # Perform operations directly in the preallocated tensor
+        all_swaps_tensor[idx, u, x, v, y] = 1
+        all_swaps_tensor[idx, x, u, y, v] = 1
+        all_swaps_tensor[idx, v, y, u, x] = 1
+        all_swaps_tensor[idx, y, v, x, u] = 1
+
+    return all_swaps_tensor 
+
+
+def compute_features_fps(graph, num, deshacer_l):
+
+    grafo_i = genera_intermedio(graph,deshacer_l)
+    # print("1")
+    ruido, _, natoms = embed_edges_manuel(grafo_i, list(grafo_i.nodes()))
+    # print("2")
+    gemb, nemb, distances = embed_graph_nodes_norm(grafo_i)
+    # print("3")
+    edge_index, edge_attr = embed_edges_with_cycle_sizes_norm(grafo_i)
+    # print(edge_index, edge_attr)
+    # print("4")
+    dosd_positions = calculate_2d_distances_ordered(grafo_i, list(grafo_i.nodes())) # se deberia de añadir al distances
+
+    mol = nx_to_rdkit(grafo_i, False)
+    fingerprint = AllChem.GetMorganFingerprintAsBitVect(mol, radius=3)
+    fingerprint = list(fingerprint)
+    del(grafo_i)
+
+    return ruido, gemb, nemb, distances, edge_index, edge_attr, natoms, num, dosd_positions, fingerprint
+
+def compute_features_cero_fps(grafo_i):
+
+    # print("1")
+    ruido, _, natoms = embed_edges_manuel(grafo_i, list(grafo_i.nodes()))
+    # print("2")
+    gemb, nemb, distances = embed_graph_nodes_norm(grafo_i)
+    # print("3")
+    edge_index, edge_attr = embed_edges_with_cycle_sizes_norm(grafo_i)
+    # print(edge_index, edge_attr)
+    # print("4")
+    dosd_positions = calculate_2d_distances_ordered(grafo_i, list(grafo_i.nodes())) # se deberia de añadir al distances
+
+    mol = nx_to_rdkit(grafo_i, False)
+    fingerprint = AllChem.GetMorganFingerprintAsBitVect(mol, radius=3)
+    fingerprint = list(fingerprint)
+    
+    
+    
+    return ruido, gemb, nemb, distances, edge_index, edge_attr, natoms, 0, dosd_positions, fingerprint

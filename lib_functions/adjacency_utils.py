@@ -6,6 +6,7 @@ from rdkit import Chem
 import torch
 from copy import deepcopy
 
+
 def pad_adjs(ori_adj, node_number):
     a = ori_adj
     ori_len = a.shape[-1]
@@ -233,3 +234,29 @@ def connected_double_edge_swap(G, nswap=1, _window_threshold=3, seed=None):
     else:
         end = False
     return swapcount, G, intermediate_graphs, end, final_swaps, removed_edges_accumulated, added_edges_accumulated
+
+def genera_intermedio(graph, deshacer_l):
+    """
+    Generates an intermediate graph by applying a series of double edge swaps.
+    
+    Args:
+        graph: The input graph
+        deshacer_l: List of tuples containing edges to swap
+        
+    Returns:
+        Modified graph after applying the swaps
+    """
+    dk = [n for n, d in graph.degree()]
+    for d in deshacer_l:
+        u = dk[d[0][0]]
+        v = dk[d[0][1]]
+        x = dk[d[1][0]]
+        y = dk[d[1][1]]
+        graph.remove_edge(u, v)
+        graph.remove_edge(x, y)
+        graph.add_edge(u, x)
+        graph.add_edge(v, y)
+    return graph
+
+
+

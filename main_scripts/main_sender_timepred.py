@@ -33,9 +33,9 @@ def main():
 
     total_molecules = len(df)  # total number of molecules you have
     batch_size = 100000        # number of molecules to process per batch
-    epoca = 2
+    epoca = 0
 
-    subproceso = 7 # definir a 0 inicialmente  
+    subproceso = 0 # definir a 0 inicialmente  
     for start_index in range(subproceso*batch_size, total_molecules, batch_size):
         print(start_index)
         run_script(start_index, batch_size, subproceso, epoca)

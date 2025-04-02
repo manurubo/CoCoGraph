@@ -1,104 +1,21 @@
 from lib_functions.libraries import *
 from lib_functions.config import *
 
-from lib_functions.models import TimePredictionModel_graph_fps_finetune
-
-from lib_functions.data_preparation_utils import embed_edges_with_cycle_sizes_norm, embed_edges_manuel
-from lib_functions.data_preparation_utils import calculate_2d_distances_ordered, embed_graph_nodes_norm
+from lib_functions.models import TimePredictionModel_graph, TimePredictionModel_graph_fps_finetune
 from lib_functions.data_preparation_utils import embed_graph_nodes_norm_timepred
+from lib_functions.data_preparation_utils import compute_features_fps, compute_features_cero_fps, compute_features_timepred, save_plot_data
+from lib_functions.adjacency_utils import connected_double_edge_swap
 
 from lib_functions.data_loader import build_dataset_alejandro
 
 import random 
-
 import os
-
-from lib_functions.adjacency_utils import connected_double_edge_swap
-from lib_functions.adjacency_utils import nx_to_rdkit
 from copy import deepcopy
-
-from multiprocessing import Pool
-
-import itertools
-
 import concurrent.futures
-
 import json
-
 import gc 
-
 import argparse
-
 from rdkit.Chem import AllChem
-
-
-def genera_intermedio(graph, deshacer_l):
-    dk = [n for n, d in graph.degree()]
-    for d in deshacer_l:
-        # print("xxxxxxxx")
-        u = dk[d[0][0]]
-        v = dk[d[0][1]]
-        x = dk[d[1][0]]
-        y = dk[d[1][1]]
-        graph.remove_edge(u, v)
-        graph.remove_edge(x, y)
-        graph.add_edge(u, x)
-        graph.add_edge(v, y)
-    return graph
-
-def compute_features(graph, num, deshacer_l):
-
-    grafo_i = genera_intermedio(graph,deshacer_l)
-    # print("1")
-    ruido, _, natoms = embed_edges_manuel(grafo_i, list(grafo_i.nodes()))
-    # print("2")
-    gemb, nemb, distances = embed_graph_nodes_norm(grafo_i)
-    # print("3")
-    edge_index, edge_attr = embed_edges_with_cycle_sizes_norm(grafo_i)
-    # print(edge_index, edge_attr)
-    # print("4")
-    dosd_positions = calculate_2d_distances_ordered(grafo_i, list(grafo_i.nodes())) # se deberia de añadir al distances
-
-    mol = nx_to_rdkit(grafo_i, False)
-    fingerprint = AllChem.GetMorganFingerprintAsBitVect(mol, radius=3)
-    fingerprint = list(fingerprint)
-    del(grafo_i)
-
-    return ruido, gemb, nemb, distances, edge_index, edge_attr, natoms, num, dosd_positions, fingerprint
-
-def compute_features_cero(grafo_i):
-
-    # print("1")
-    ruido, _, natoms = embed_edges_manuel(grafo_i, list(grafo_i.nodes()))
-    # print("2")
-    gemb, nemb, distances = embed_graph_nodes_norm(grafo_i)
-    # print("3")
-    edge_index, edge_attr = embed_edges_with_cycle_sizes_norm(grafo_i)
-    # print(edge_index, edge_attr)
-    # print("4")
-    dosd_positions = calculate_2d_distances_ordered(grafo_i, list(grafo_i.nodes())) # se deberia de añadir al distances
-
-    mol = nx_to_rdkit(grafo_i, False)
-    fingerprint = AllChem.GetMorganFingerprintAsBitVect(mol, radius=3)
-    fingerprint = list(fingerprint)
-    
-    
-    
-    return ruido, gemb, nemb, distances, edge_index, edge_attr, natoms, 0, dosd_positions, fingerprint
-
-def compute_features_timepred(graph, num, deshacer_l):
-
-    grafo_i = genera_intermedio(graph,deshacer_l)
-
-    gemb = embed_graph_nodes_norm_timepred(grafo_i)
-
-    del(grafo_i)
-    
-    return gemb
-
-def save_plot_data(data, filename):
-    with open(filename, 'w') as f:
-        json.dump(data, f)
 
 def main(train_dl, test_dl, model, checkpoint, executor, slice, epoch, saca_grafo, inversa, optimizers, schedulers):
     optimizer_pretrained, optimizer_new = optimizers
@@ -192,7 +109,7 @@ def main(train_dl, test_dl, model, checkpoint, executor, slice, epoch, saca_graf
 
                     # Submit tasks #aqui meter el timepred o no, segun interese
                     if saca_grafo:
-                        futures = [executor.submit(compute_features, train_graph_b[count], num, rem ) for num, rem  in enumerate(rem_acc)]
+                        futures = [executor.submit(compute_features_fps, train_graph_b[count], num, rem ) for num, rem  in enumerate(rem_acc)]
                     else: 
                         futures = [executor.submit(compute_features_timepred, train_graph_b[count], num, rem ) for num, rem  in enumerate(rem_acc)]
 
@@ -218,7 +135,7 @@ def main(train_dl, test_dl, model, checkpoint, executor, slice, epoch, saca_graf
                             nl = 0.0
                             nls.append(nl)  
 
-                        ruido, gemb, nemb, distances, edge_index, edge_attr, natoms, num, dosd, fingerprint = compute_features_cero(train_graph_b[count])
+                        ruido, gemb, nemb, distances, edge_index, edge_attr, natoms, num, dosd, fingerprint = compute_features_cero_fps(train_graph_b[count])
                         distances = torch.Tensor(distances)
                         dosd = torch.Tensor(dosd)
                         fingerprint = torch.Tensor(fingerprint)
@@ -418,6 +335,7 @@ def initialize_finetune_model(pretrained_model_path, device):
     # Filter out keys that are common between the two models
     common_keys = set(finetune_state_dict.keys()).intersection(set(pretrained_state_dict.keys()))
     pretrained_common_dict = {k: v for k, v in pretrained_state_dict.items() if k in common_keys}
+    print(pretrained_common_dict.keys())
 
     # Update the finetune model's state dict with the pre-trained weights
     finetune_state_dict.update(pretrained_common_dict)
@@ -497,7 +415,7 @@ if __name__ == "__main__":
 
     # Convertir la fecha al formato deseado
     # date_str = current_date.strftime('%y%m%d')  + "only_quads"
-    date_str = "241216_all_timepred_fps_finetune"
+    date_str = "Prueba_Finetune_timepred_fps"
     # date_carga = "240828_all_timepred_largo_graph_continua"
     
     # Crear directorios si no existen

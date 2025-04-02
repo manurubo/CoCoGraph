@@ -5,90 +5,17 @@ from lib_functions.models import TimePredictionModel_graph
 from lib_functions.data_preparation_utils import embed_edges_with_cycle_sizes_norm, embed_edges_manuel
 from lib_functions.data_preparation_utils import calculate_2d_distances_ordered, embed_graph_nodes_norm
 from lib_functions.data_preparation_utils import embed_graph_nodes_norm_timepred
-from lib_functions.data_loader import build_dataset_alejandro
-
+from lib_functions.data_preparation_utils import compute_features, compute_features_cero, compute_features_timepred, save_plot_data
+from lib_functions.adjacency_utils import connected_double_edge_swap, genera_intermedio
 from lib_functions.data_loader import build_dataset_alejandro
 
 import random 
-
 import os
-
-from lib_functions.adjacency_utils import connected_double_edge_swap
 from copy import deepcopy
-
-from multiprocessing import Pool
-
-import itertools
-
 import concurrent.futures
-
 import json
-
 import gc 
-
 import argparse
-
-def genera_intermedio(graph, deshacer_l):
-    dk = [n for n, d in graph.degree()]
-    for d in deshacer_l:
-        # print("xxxxxxxx")
-        u = dk[d[0][0]]
-        v = dk[d[0][1]]
-        x = dk[d[1][0]]
-        y = dk[d[1][1]]
-        graph.remove_edge(u, v)
-        graph.remove_edge(x, y)
-        graph.add_edge(u, x)
-        graph.add_edge(v, y)
-    return graph
-
-def compute_features(graph, num, deshacer_l):
-
-    grafo_i = genera_intermedio(graph,deshacer_l)
-    # print("1")
-    ruido, _, natoms = embed_edges_manuel(grafo_i, list(grafo_i.nodes()))
-    # print("2")
-    gemb, nemb, distances = embed_graph_nodes_norm(grafo_i)
-    # print("3")
-    edge_index, edge_attr = embed_edges_with_cycle_sizes_norm(grafo_i)
-    # print(edge_index, edge_attr)
-    # print("4")
-    dosd_positions = calculate_2d_distances_ordered(grafo_i, list(grafo_i.nodes())) # se deberia de añadir al distances
-
-    
-    del(grafo_i)
-
-    return ruido, gemb, nemb, distances, edge_index, edge_attr, natoms, num, dosd_positions
-
-def compute_features_cero(grafo_i):
-
-    # print("1")
-    ruido, _, natoms = embed_edges_manuel(grafo_i, list(grafo_i.nodes()))
-    # print("2")
-    gemb, nemb, distances = embed_graph_nodes_norm(grafo_i)
-    # print("3")
-    edge_index, edge_attr = embed_edges_with_cycle_sizes_norm(grafo_i)
-    # print(edge_index, edge_attr)
-    # print("4")
-    dosd_positions = calculate_2d_distances_ordered(grafo_i, list(grafo_i.nodes())) # se deberia de añadir al distances
-    
-    
-    
-    return ruido, gemb, nemb, distances, edge_index, edge_attr, natoms, 0, dosd_positions
-
-def compute_features_timepred(graph, num, deshacer_l):
-
-    grafo_i = genera_intermedio(graph,deshacer_l)
-
-    gemb = embed_graph_nodes_norm_timepred(grafo_i)
-
-    del(grafo_i)
-    
-    return gemb
-
-def save_plot_data(data, filename):
-    with open(filename, 'w') as f:
-        json.dump(data, f)
 
 def main(train_dl, test_dl, model, checkpoint, executor, slice, epoch, saca_grafo, inversa ):
 
