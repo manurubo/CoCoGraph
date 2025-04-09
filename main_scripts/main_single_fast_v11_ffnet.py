@@ -121,7 +121,7 @@ def main(train_dl, model, checkpoint, executor, slice, epoch ):
                 try: # try in case of error it restarts the executor
                     results = []
                     for future in futures:
-                        results.append(future.result(timeout=20))
+                        results.append(future.result(timeout=60))
                     
                     # Process results
                     for result, molecule_index in zip(results, range(len(results))):
@@ -292,7 +292,7 @@ def main(train_dl, model, checkpoint, executor, slice, epoch ):
                 # If there is an error, shut down the executor and restart it
                 except Exception as e:
                     executor.shutdown(wait=True)  # Shut down the broken executor
-                    executor = concurrent.futures.ProcessPoolExecutor(max_workers=24)
+                    executor = concurrent.futures.ProcessPoolExecutor(max_workers=20)
                     print(f"\033[31m {e} \033[0m")
                     continue
                 count=count+1
@@ -501,5 +501,5 @@ if __name__ == "__main__":
     model = model.to(device)
 
     # Create the executor
-    with concurrent.futures.ProcessPoolExecutor(max_workers=24) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=20) as executor:
         main(train_dl, model, checkpoint, executor, args.slice, args.epoch)
