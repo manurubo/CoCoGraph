@@ -1,6 +1,7 @@
 import subprocess
 import os
 import sys
+import argparse
 
 # Add the parent directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -25,21 +26,29 @@ def run_script(start_index, num_molecules, subproceso, epoca):
     subprocess.run(command, check=True, env=env)
     
 def main():
-    
+    parser = argparse.ArgumentParser(description='Run main model script in batches.')
+    parser.add_argument('--slice', type=int, required=True, help='Starting slice number.')
+    parser.add_argument('--epoch', type=int, required=True, help='Epoch number.')
+    parser.add_argument('--start_index', type=int, default=0, help='Starting molecule index.')
+    parser.add_argument('--num_molecules', type=int, default=100000, help='Number of molecules per batch (batch size).')
+
+    args = parser.parse_args()
 
     with open('Data/TotalSmilesTogether.pickle', 'rb') as inf:
         df = load(inf)
         df = df.sample(frac=1, random_state=1111).reset_index(drop=True)
 
     total_molecules = len(df)  # total number of molecules you have
-    batch_size = 100000        # number of molecules to process per batch
-    epoca = 0
+    batch_size = args.num_molecules # Use num_molecules argument as batch_size
 
-    subproceso = 0 # set to 0 initially
-    for start_index in range(subproceso*batch_size, total_molecules, batch_size):
-        print(start_index)
-        run_script(start_index, batch_size, subproceso, epoca)
-        subproceso+=1
+    current_slice = args.slice # Initialize current_slice with the provided slice argument
+
+    print(f"Starting epoch {args.epoch} from index {args.start_index} with batch size {batch_size}, initial slice {current_slice}")
+
+    for start_index_loop in range(args.start_index, total_molecules, batch_size):
+        print(f"Processing batch starting at index: {start_index_loop}, slice: {current_slice}")
+        run_script(start_index_loop, batch_size, current_slice, args.epoch)
+        current_slice += 1
 
 if __name__ == '__main__':
     main()

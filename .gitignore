@@ -34,3 +34,7 @@ ENV/
 Thumbs.db 
 
 *.sty
+files/Prueba*
+models/Prueba*
+resultados/Prueba*
+entrena*
