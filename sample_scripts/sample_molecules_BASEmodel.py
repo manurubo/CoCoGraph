@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from lib_functions.libraries import *
 from lib_functions.config import *
-from lib_functions.models import GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2, TimePredictionModel_graph
+from lib_functions.models import GINEdgeQuadrupletPredictor, GINETimePredictor
 from lib_functions.sample_utils import calculate_data_molecule, sample_step_graph
 from lib_functions.data_preparation_utils import embed_edges_manuel
 from lib_functions.data_loader import build_dataset_alejandro
@@ -92,7 +92,7 @@ def process_batch(conjunto, model, num, b_molecule, cantidad, time_model):
                 all_smiles_for_all_molecules.append(set())
         
         # calculate the data for each molecule
-        futures = [executor_gpu.submit(calculate_data_molecule, graph, tensor, num_swaps, contador_molecula) for graph, tensor, num_swaps in zip(valid_graph_b,tensors_allmolecules, num_swaps)]
+        futures = [executor_gpu.submit(calculate_data_molecule, graph, tensor, num_swaps, molecule_counter) for graph, tensor, num_swaps in zip(valid_graph_b,tensors_allmolecules, num_swaps)]
         
         # Get the results
         results = [future.result() for future in futures]
@@ -218,8 +218,8 @@ if __name__ == "__main__":
     os.makedirs(molsgen_dir_temporal, exist_ok=True)
 
     # load the models
-    model = GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2()
-    time_model = TimePredictionModel_graph()
+    model = GINEdgeQuadrupletPredictor()
+    time_model = GINETimePredictor()
 
     # try to load the models
     try:

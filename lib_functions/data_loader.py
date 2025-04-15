@@ -1,4 +1,3 @@
-
 from lib_functions.config import *
 from lib_functions.data_preparation_utils import embed_edges_manuel, smiles_to_graph
 import numpy as np
@@ -6,38 +5,84 @@ from tqdm import tqdm
 import networkx as nx
 import torch
 from torch.utils.data import Dataset, DataLoader, TensorDataset, DataLoader
-
 from func_timeout import func_timeout
 
 
 def graph_collate_fn(batch):
+    """Collate function for DataLoader that handles batches of graph data.
+
+    Args:
+        batch: A list of tuples, where each tuple contains 
+               (graph, tensor, smiles, atoms).
+
+    Returns:
+        A tuple containing:
+        - A list of graphs.
+        - A tensor stacking the input tensors.
+        - A list of SMILES strings.
+        - A list of atom counts.
+    """
     graphs, tensors, smiles, atoms = zip(*batch)
-    # print(tensors)
     tensors_tensor = [torch.stack(items, dim=0) for items in zip(*tensors)]
     return graphs, tensors_tensor[0], smiles, atoms
 
 class GraphDataset(Dataset):
+    """A PyTorch Dataset for storing NetworkX graphs."""
     def __init__(self, graph_list):
+        """Initializes the GraphDataset.
+
+        Args:
+            graph_list (list): A list of NetworkX graph objects.
+        """
         self.graph_list = graph_list
     
     def __len__(self):
+        """Returns the number of graphs in the dataset."""
         return len(self.graph_list)
     
     def __getitem__(self, idx):
+        """Retrieves the graph at the specified index.
+
+        Args:
+            idx (int): The index of the graph to retrieve.
+
+        Returns:
+            networkx.Graph: The graph at the specified index.
+        """
         graph = self.graph_list[idx]
         return graph
     
 class PairedDataset(Dataset):
+    """A PyTorch Dataset that pairs NetworkX graphs with corresponding tensors, 
+    SMILES strings, and atom counts."""
     def __init__(self, graph_list, tensor_dataset, smiles_list):
+        """Initializes the PairedDataset.
+
+        Args:
+            graph_list (list): A list of NetworkX graph objects.
+            tensor_dataset (torch.utils.data.Dataset): A dataset containing tensors 
+                                                       corresponding to the graphs. Tensors are the adjacency matrices of the graphs.
+            smiles_list (list): A list of SMILES strings corresponding to the graphs.
+        """
         self.graph_list = graph_list
         self.tensor_dataset = tensor_dataset
         self.smiles_list = smiles_list
         self.num_atoms_list = [graph.number_of_nodes() for graph in graph_list]  # Number of atoms in each graph
     
     def __len__(self):
+        """Returns the total number of items in the dataset."""
         return len(self.graph_list)
     
     def __getitem__(self, idx):
+        """Retrieves the graph, tensor, SMILES string, and atom count 
+           at the specified index.
+
+        Args:
+            idx (int): The index of the item to retrieve.
+
+        Returns:
+            tuple: A tuple containing (graph, tensor, smiles, num_atoms).
+        """
         graph = self.graph_list[idx]
         tensor = self.tensor_dataset[idx]
         smiles = self.smiles_list[idx]
@@ -46,6 +91,20 @@ class PairedDataset(Dataset):
 
 
 def parallel_preprocessing(smiles, min_atom):
+    """Processes a list of SMILES strings to generate graphs and embeddings,
+    filtering by atom count and connectivity. Calculates bond statistics.
+
+    Uses func_timeout to prevent excessively long processing for single molecules.
+
+    Args:
+        smiles (list): A list of SMILES strings.
+        min_atom (int): The minimum number of atoms a molecule must have to be included.
+
+    Returns:
+        tuple: Contains lists of valid graphs, edge embeddings, SMILES strings,
+               bond counts, atom counts, the total number of valid molecules,
+               total bond counts across all valid molecules, and the total possible bonds.
+    """
     max_atom = MAX_ATOM
     g0_list = []
     eemb_list = []
@@ -81,11 +140,26 @@ def parallel_preprocessing(smiles, min_atom):
 import gc 
 
 def build_dataset_alejandro(all_smiles, ftr=0.8, fva=0.1, bs=(NSTEP+1)*100, nsteps=NSTEP, min_atom=5, max_atom=MAX_ATOM):
+    """Builds training, validation, and test datasets and dataloaders from a list
+    of SMILES strings using parallel preprocessing.
+
+    Args:
+        all_smiles (list): A list of all SMILES strings for the dataset.
+        ftr (float, optional): Fraction of data to use for training. Defaults to 0.8.
+        fva (float, optional): Fraction of data to use for validation. Defaults to 0.1.
+        bs (int, optional): Batch size for the DataLoaders. Defaults to (NSTEP+1)*100.
+        nsteps (int, optional): Number of steps (used in default batch size calculation). Defaults to NSTEP.
+        min_atom (int, optional): Minimum number of atoms for filtering molecules. Defaults to 5.
+        max_atom (int, optional): Maximum number of atoms for filtering molecules. Defaults to MAX_ATOM.
+
+    Returns:
+        tuple: Contains the training DataLoader, validation DataLoader, test DataLoader,
+               and the percentage of each bond type across the dataset.
+    """
     # Prepare the whole dataset with all the embeddings
     g_list, e_list, s_list, nmol = [], [], [], 0
     pos_bonds = 0
     nbonds_tot = np.array([0,0,0,0])
-    contador = 0
 
     num_splits = 100
     all_smiles_split = np.array_split(all_smiles, num_splits)
@@ -94,7 +168,6 @@ def build_dataset_alejandro(all_smiles, ftr=0.8, fva=0.1, bs=(NSTEP+1)*100, nste
     futures = []
     executor = concurrent.futures.ProcessPoolExecutor(max_workers=16)
 
-    #with concurrent.futures.ProcessPoolExecutor(max_workers=8) as executor:
     for smiles_sm in all_smiles_split:
         future = executor.submit(parallel_preprocessing, smiles_sm, min_atom)
         futures.append(future)

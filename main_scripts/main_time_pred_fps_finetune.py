@@ -1,7 +1,7 @@
 from lib_functions.libraries import *
 from lib_functions.config import *
 
-from lib_functions.models import TimePredictionModel_graph, TimePredictionModel_graph_fps_finetune
+from lib_functions.models import GINETimePredictor, GINETimePredictor_MorganFP
 from lib_functions.data_preparation_utils import embed_graph_nodes_norm_timepred
 from lib_functions.data_preparation_utils import compute_features_fps, compute_features_cero_fps, compute_features_timepred, save_plot_data
 from lib_functions.adjacency_utils import connected_double_edge_swap
@@ -235,10 +235,10 @@ def main(train_dl,  model, checkpoint, executor, slice, epoch, optimizers, sched
 
 def initialize_finetune_model(pretrained_model_path, device):
     # Initialize the Morgan-enhanced model
-    finetune_model = TimePredictionModel_graph_fps_finetune().to(device)
+    finetune_model = GINETimePredictor_MorganFP().to(device)
     
     # Load the pre-trained model
-    pretrained_model = TimePredictionModel_graph()
+    pretrained_model = GINETimePredictor()
     pretrained_checkpoint = torch.load(pretrained_model_path, map_location=device)
     pretrained_model.load_state_dict(pretrained_checkpoint['model_state_dict'])
 

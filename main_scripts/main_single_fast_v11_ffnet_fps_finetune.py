@@ -1,10 +1,10 @@
 from lib_functions.libraries import *
 from lib_functions.config import *
 
-from lib_functions.models import GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2, GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2_morgan_finetune_2
+from lib_functions.models import GINEdgeQuadrupletPredictor, GINEdgeQuadrupletPredictor_MorganFP
 from lib_functions.losses import loss_func_vs_inicio
 from lib_functions.data_preparation_utils import compute_features_fps, save_plot_data
-from lib_functions.adjacency_utils import generate_mask2, connected_double_edge_swap, nx_to_rdkit
+from lib_functions.adjacency_utils import generate_padding_mask, connected_double_edge_swap, nx_to_rdkit
 from lib_functions.data_preparation_utils import generate_swap_tensors_optimized
 
 from lib_functions.data_loader import build_dataset_alejandro
@@ -23,10 +23,10 @@ import argparse
 
 def initialize_finetune_model(pretrained_model_path, device):
     # Initialize the Morgan-enhanced model
-    finetune_model = GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2_morgan_finetune_2().to(device)
+    finetune_model = GINEdgeQuadrupletPredictor_MorganFP().to(device)
     
     # Load the pre-trained model
-    pretrained_model = GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2()
+    pretrained_model = GINEdgeQuadrupletPredictor()
     pretrained_checkpoint = torch.load(pretrained_model_path, map_location=device)
     pretrained_model.load_state_dict(pretrained_checkpoint['model_state_dict'])
 
@@ -203,7 +203,7 @@ def main(train_dl,  model, checkpoint, executor, slice, epoch, optimizers, sched
                             entry_mask = entry_mask1 * entry_mask2
                             
                             # Create the mask for the training graphs based on padding
-                            masks_b = generate_mask2(train_mask_b[count]) 
+                            masks_b = generate_padding_mask(train_mask_b[count]) 
     
                             # Repeat the mask for the number of noise edges
                             padding_mask = masks_b.repeat(len(train_noise_edge_b_list), 1, 1)

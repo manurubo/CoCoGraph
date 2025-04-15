@@ -37,10 +37,10 @@ These files provide essential functionality for the training process:
 - `libraries.py` - Contains all import statements for external libraries used in the project
 - `config.py` - Contains configuration parameters and settings
 - `models.py` - Contains neural network model definitions including:
-  - `GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2` - Base diffusion model
-  - `GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2_morgan_finetune_2` - Fingerprint-enhanced model
-  - `TimePredictionModel_graph` - Base time prediction model
-  - `TimePredictionModel_graph_fps_finetune` - Fingerprint-enhanced time prediction model
+  - `GINEdgeQuadrupletPredictor` - Base diffusion model
+  - `GINEdgeQuadrupletPredictor_MorganFP` - Fingerprint-enhanced model
+  - `GINETimePredictor` - Base time prediction model
+  - `GINETimePredictor_MorganFP` - Fingerprint-enhanced time prediction model
 - `data_preparation_utils.py` - Contains utilities for data preparation including embed_edges functions
 - `data_loader.py` - Contains utilities for loading and processing data
 - `adjacency_utils.py` - Contains utilities for handling molecule adjacency matrices

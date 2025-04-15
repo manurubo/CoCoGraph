@@ -16,11 +16,8 @@ MAX_ATOM = 70
 NNFEAT = 31 
 NGFEAT = 21
 
-NHEAD_MOLFORMER = 8
 NHEAD = 1
 
-NGFEAT_EXTRA = 41
-NNFEAT_EXTRA = 46
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print('Running on', device)

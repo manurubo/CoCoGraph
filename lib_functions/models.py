@@ -17,6 +17,26 @@ from torch_geometric.typing import (
 from torch import Tensor
 
 class EnhancedGINEConv(GINEConv):
+    """
+    An enhanced Graph Isomorphism Network (GIN) convolution layer that incorporates
+    global graph features into the node update mechanism.
+
+    It extends the standard GINEConv by adding a transformation for global features
+    and including them in the final node representation calculation.
+
+    Args:
+        nn (torch.nn.Module): A neural network `h_\theta` that maps node features
+            `x_j` of shape `[-1, in_channels]` to shape `[-1, out_channels]`, *e.g.*,
+            defined by `torch.nn.Sequential`.
+        global_feat_dim (int): Dimensionality of the global features vector.
+        eps (float, optional): Initial `\epsilon` value. (default: `0.`)
+        train_eps (bool, optional): If set to `True`, `\epsilon` will be a trainable
+            parameter. (default: `False`)
+        edge_dim (int, optional): Edge feature dimensionality. If set to `None`,
+            input edge features are not used. (default: `None`)
+        **kwargs (optional): Additional arguments of
+            `torch_geometric.nn.conv.MessagePassing`.
+    """
     def __init__(self, nn: torch.nn.Module, global_feat_dim: int,  eps: float = 0., train_eps: bool = False, edge_dim: Optional[int] = None, **kwargs):
         super().__init__(nn, eps, train_eps, edge_dim, **kwargs)
         # Transform global features to match node features' dimensionality
@@ -39,14 +59,26 @@ class EnhancedGINEConv(GINEConv):
         edge_attr: OptTensor = None,
         size: Size = None,
     ) -> Tensor:
+        """
+        Forward pass for the EnhancedGINEConv layer.
 
+        Args:
+            x (Union[Tensor, OptPairTensor]): The input node features. Can be a
+                single tensor or a tuple of tensors for bipartite graphs.
+            edge_index (Adj): The edge indices.
+            global_features (Tensor): Precomputed global features for the graph(s).
+            edge_attr (OptTensor, optional): Edge features. (default: `None`)
+            size (Size, optional): The size of the output tensor. (default: `None`)
+
+        Returns:
+            Tensor: The updated node embeddings.
+        """
         if isinstance(x, Tensor):
             x = (x, x)
 
         # Transform global features ESTO HAY QUE MIRARLO
         transformed_global_features = self.global_features_transform(global_features)
         
-
         # # Broadcast global features to each node
         transformed_global_features = transformed_global_features.repeat(x[1].size(0), 1)
 
@@ -59,57 +91,33 @@ class EnhancedGINEConv(GINEConv):
 
         return self.nn(out)
 
-class EnhancedGINEConvFPS(GINEConv):
-    def __init__(self, nn: torch.nn.Module, global_feat_dim: int, fingerprint_dim: int, eps: float = 0., train_eps: bool = False, edge_dim: Optional[int] = None, **kwargs):
-        super().__init__(nn, eps, train_eps, edge_dim, **kwargs)
-        
-        # Transform global features to match node features' dimensionality
-        if global_feat_dim is not None:
-            if isinstance(self.nn, torch.nn.Sequential):
-                nn = self.nn[0]
-            if hasattr(nn, 'in_features'):
-                in_channels = nn.in_features
-            elif hasattr(nn, 'in_channels'):
-                in_channels = nn.in_channels
-            else:
-                raise ValueError("Could not infer input channels from `nn`.")
-            
-            # Transform global features and fingerprints to match node features' dimensionality
-            self.global_features_transform = Linear(global_feat_dim, in_channels)
-            self.fingerprint_transform = Linear(fingerprint_dim, in_channels)  # New transformation for fingerprints
-    
-    def forward(
-        self,
-        x: Union[Tensor, OptPairTensor],
-        edge_index: Adj,
-        global_features: Tensor,  # Global graph features
-        fingerprints: Tensor,     # New argument for fingerprints
-        edge_attr: OptTensor = None,
-        size: Size = None,
-    ) -> Tensor:
 
-        if isinstance(x, Tensor):
-            x = (x, x)
+class GINEdgeQuadrupletPredictor(torch.nn.Module):
+    """
+    Predicts probabilities for breaking and making edges between node pairs
+    using an Enhanced GINE architecture.
 
-        # Transform global features
-        transformed_global_features = self.global_features_transform(global_features)
-        transformed_global_features = transformed_global_features.repeat(x[1].size(0), 1)
+    It processes node features, edge features (including DOSD distances),
+    global graph features, pairwise distances, and a noise level.
+    The model outputs separate logit matrices for breaking and making edges,
+    and calculates quadruplet probabilities based on these.
 
+    Inputs in `forward` (via `data` object):
+        - `data.x`: Node features [num_nodes, num_node_features]
+        - `data.edge_index`: Graph connectivity [2, num_edges]
+        - `data.edge_attr`: Edge features [num_edges, num_edge_features]
+        - `data.xA`: Global graph features [num_graphs, num_global_features]
+        - `data.noiselevel`: Noise level scalar for the graph.
+        - `data.distances`: Pairwise distances between nodes [MAX_ATOM, MAX_ATOM, num_distance_features]
+        - `data.dosd_distances`: DOSD distances between nodes [MAX_ATOM, MAX_ATOM]
+        - `data.batch`: Batch assignment vector [num_nodes]
 
-        # Transform fingerprints
-        transformed_fingerprints = self.fingerprint_transform(fingerprints)
-        transformed_fingerprints = transformed_fingerprints.repeat(x[1].size(0), 1)
-
-        # Combine the node features with the global features and fingerprints
-        out = self.propagate(edge_index, x=x, edge_attr=edge_attr, size=size)
-
-        x_r = x[1]
-        if x_r is not None:
-            out = out + (1 + self.eps) * x_r + transformed_global_features + transformed_fingerprints
-
-        return self.nn(out)
-
-class GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2(torch.nn.Module):
+    Outputs in `forward`:
+        - `pairs_break`: Logits for breaking an edge [batch_size, MAX_ATOM, MAX_ATOM]
+        - `pairs_make`: Logits for making an edge [batch_size, MAX_ATOM, MAX_ATOM]
+        - `quadruplet_probabilities`: Probabilities for quadruplet interactions
+          [batch_size, MAX_ATOM, MAX_ATOM, MAX_ATOM, MAX_ATOM] (derived from break/make logits)
+    """
     def __init__(self):
         super().__init__()
         nn1 = Sequential(Linear(NNFEAT+1, 2*NNFEAT), ReLU(), Linear(2*NNFEAT, 2*NNFEAT*2*NHEAD))
@@ -134,7 +142,6 @@ class GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2(torch.nn.Module):
             Linear(2*NGFEAT, 2*NGFEAT)
         )
         
-        # Improved feedforward networks with LayerNorm and residual connections
         self.ff_break = nn.ModuleList([
             nn.Sequential(
                 nn.LayerNorm(4*NNFEAT+2*NGFEAT+12+17+1),
@@ -182,7 +189,6 @@ class GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2(torch.nn.Module):
 
         # Add DOSD distances to edge attributes
         dosd_values = dosd_distances[edge_index[0], edge_index[1]].unsqueeze(1)
-        # print(dosd_values)
         edge_attr_added = torch.cat([edge_attr, dosd_values], dim=1)
         
         # Process noise level
@@ -201,35 +207,26 @@ class GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2(torch.nn.Module):
         x = F.relu(self.conv3(x, edge_index, xA, edge_attr_added))
         x_base = self.ff3(x)
         x_gen = global_max_pool(x_base, batch)
+
         # ANN for the graph embedding
         shBatch = x_gen.shape[0]
         xA_m = xA.reshape([shBatch, NGFEAT])
         xann = self.mlpGraph(xA_m)
 
-        # Formar todos los pares posibles de embeddings
+        # Create all possible pairs of embeddings
         x1 = x_base.unsqueeze(1).repeat(1, x_base.size(0), 1)  # Tamaño: [35, 35, 60]
         x2 = x_base.unsqueeze(0).repeat(x_base.size(0), 1, 1)  # Tamaño: [35, 35, 60]
 
         expanded_xann = xann.unsqueeze(0).expand(x1.size(0), x1.size(1), -1)    
-        expanded_x_gen = x_gen.unsqueeze(0).expand(x1.size(0), x1.size(1), -1)
 
         # Initialize the zero matrix for edge attributes
-        # start = datetime.now()
         edge_attr_matrix = torch.zeros(MAX_ATOM, MAX_ATOM, edge_attr.size(1), device=x.device)
 
-        # print("edge_attr")
-        # print(edge_attr)
         # Assign edge attributes using advanced indexing
         edge_attr_matrix[edge_index[0], edge_index[1]] = edge_attr
         
-        
-        # final = datetime.now()
-        # print(f"tiempo {final-start}")
         # Concatenate edge attributes to pairs
-        pairs = torch.cat([x1, x2, expanded_xann, distances, edge_attr_matrix, dosd_distances.unsqueeze(-1)], dim=2)  # Adjust dimension as per actual sizes
-
-        # every pair of nodes is expanded with graph embedding
-        # pairs = torch.cat([x1, x2, expanded_xann, distances], dim=2)  # Tamaño: [N, N, 142]
+        pairs = torch.cat([x1, x2, expanded_xann, distances, edge_attr_matrix, dosd_distances.unsqueeze(-1)], dim=2)  
 
         pairs_flattened = pairs.view(-1, MAX_ATOM * MAX_ATOM, 4*NNFEAT+2*NGFEAT+12+17+1)
 
@@ -257,8 +254,19 @@ class GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2(torch.nn.Module):
         return pairs_break, pairs_make, quadruplet_probabilities
         
     def calculate_quadruplet_probabilities(self, pairs_break, pairs_make):
-        num_nodes = MAX_ATOM  # Assuming a graph with 35 nodes
-        
+        """
+        Calculates quadruplet interaction probabilities from break/make logits.
+
+        Ensures symmetry and combines probabilities assuming independence.
+
+        Args:
+            pairs_break (Tensor): Logits for breaking edges [MAX_ATOM, MAX_ATOM].
+            pairs_make (Tensor): Logits for making edges [MAX_ATOM, MAX_ATOM].
+
+        Returns:
+            Tensor: Sigmoid probabilities for quadruplet interactions
+                    [MAX_ATOM, MAX_ATOM, MAX_ATOM, MAX_ATOM].
+        """
         pairs_break = pairs_break.squeeze(0)
         pairs_make = pairs_make.squeeze(0)
         
@@ -266,26 +274,29 @@ class GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2(torch.nn.Module):
         pairs_break = (pairs_break + pairs_break.T) / 2
         pairs_make = (pairs_make + pairs_make.T) / 2
 
-#         # Calcular las probabilidades de destruir aristas para todas las combinaciones de quadrupletas
-#         prob_destruir = pairs_break.unsqueeze(2).unsqueeze(3) + pairs_break.unsqueeze(0).unsqueeze(1)
-
-#         # Calcular las probabilidades de crear aristas para todas las combinaciones de quadrupletas
-#         # Necesitamos reorganizar las dimensiones para alinear correctamente las aristas que se crearán
-#         prob_crear = - pairs_make.unsqueeze(1).unsqueeze(3) - pairs_make.unsqueeze(0).unsqueeze(2)
-
-        # Combinar las probabilidades de destruir y crear
+        # Combine the probabilities of destroy and create
         quadruplet_probabilities = pairs_break.unsqueeze(2).unsqueeze(3) + pairs_break.unsqueeze(0).unsqueeze(1) + pairs_make.unsqueeze(1).unsqueeze(3) + pairs_make.unsqueeze(0).unsqueeze(2)
-        
-        # print(quadruplet_probabilities.shape)
 
-        # Summing over the batch dimension if necessary
-#         quadruplet_probabilities = quadruplet_probabilities.sum(dim=0)
-        
         quadruplet_probabilities = torch.sigmoid(quadruplet_probabilities)
         
         return quadruplet_probabilities
 
-class GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2_morgan_finetune_2(torch.nn.Module):
+class GINEdgeQuadrupletPredictor_MorganFP(torch.nn.Module):
+    """
+    Predicts probabilities for breaking and making edges using an Enhanced GINE
+    architecture, incorporating Morgan fingerprints.
+
+    Similar to `GINEdgeQuadrupletPredictor`, but adds processed Morgan
+    fingerprints to the feature representation before the final reduction layers
+    for edge prediction.
+
+    Inputs in `forward` (via `data` object):
+        - All inputs from `GINEdgeQuadrupletPredictor`
+        - `data.morgan_fp`: Morgan fingerprints for the graph [num_graphs, morgan_fp_dim]
+
+    Outputs in `forward`:
+        - Same as `GINEdgeQuadrupletPredictor`.
+    """
     def __init__(self):
         super().__init__()
         nn1 = Sequential(Linear(NNFEAT+1, 2*NNFEAT), ReLU(), Linear(2*NNFEAT, 2*NNFEAT*2*NHEAD))
@@ -326,8 +337,6 @@ class GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2_morgan_finetune_2(t
             Linear(256, 256)
         )
 
-        
-        
         # Improved feedforward networks with LayerNorm and residual connections
         self.ff_break = nn.ModuleList([
             nn.Sequential(
@@ -384,14 +393,11 @@ class GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2_morgan_finetune_2(t
 
         # Add DOSD distances to edge attributes
         dosd_values = dosd_distances[edge_index[0], edge_index[1]].unsqueeze(1)
-        # print(dosd_values)
         edge_attr_added = torch.cat([edge_attr, dosd_values], dim=1)
         
         # Process noise level
         noise = self.noise_mlp(noiselevel.float().unsqueeze(0)).expand(x.size(0), -1)
         x = torch.cat([x, noise], dim=1)  # Add noise to x as a new feature
-        
-        
         
         # GATN part
         x = F.relu(self.conv1(x, edge_index, xA, edge_attr_added))
@@ -405,35 +411,25 @@ class GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2_morgan_finetune_2(t
         x = F.relu(self.conv3(x, edge_index, xA, edge_attr_added))
         x_base = self.ff3(x)
         x_gen = global_max_pool(x_base, batch)
-        # ANN for the graph embedding
+
         shBatch = x_gen.shape[0]
         xA_m = xA.reshape([shBatch, NGFEAT])
         xann = self.mlpGraph(xA_m)
 
-        # Formar todos los pares posibles de embeddings
+        # Create all possible pairs of embeddings
         x1 = x_base.unsqueeze(1).repeat(1, x_base.size(0), 1)  # Tamaño: [35, 35, 60]
         x2 = x_base.unsqueeze(0).repeat(x_base.size(0), 1, 1)  # Tamaño: [35, 35, 60]
 
         expanded_xann = xann.unsqueeze(0).expand(x1.size(0), x1.size(1), -1)    
-        expanded_x_gen = x_gen.unsqueeze(0).expand(x1.size(0), x1.size(1), -1)
 
         # Initialize the zero matrix for edge attributes
-        # start = datetime.now()
         edge_attr_matrix = torch.zeros(MAX_ATOM, MAX_ATOM, edge_attr.size(1), device=x.device)
 
-        # print("edge_attr")
-        # print(edge_attr)
         # Assign edge attributes using advanced indexing
         edge_attr_matrix[edge_index[0], edge_index[1]] = edge_attr
         
-        
-        # final = datetime.now()
-        # print(f"tiempo {final-start}")
         # Concatenate edge attributes to pairs
         pairs = torch.cat([x1, x2, expanded_xann, distances, edge_attr_matrix, dosd_distances.unsqueeze(-1)], dim=2)  # Adjust dimension as per actual sizes
-
-        # every pair of nodes is expanded with graph embedding
-        # pairs = torch.cat([x1, x2, expanded_xann, distances], dim=2)  # Tamaño: [N, N, 142]
 
         pairs_flattened = pairs.view(-1, MAX_ATOM * MAX_ATOM, 4*NNFEAT+2*NGFEAT+12+17+1)
 
@@ -467,35 +463,53 @@ class GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2_morgan_finetune_2(t
         return pairs_break, pairs_make, quadruplet_probabilities
         
     def calculate_quadruplet_probabilities(self, pairs_break, pairs_make):
-        num_nodes = MAX_ATOM  # Assuming a graph with 35 nodes
-        
+        """
+        Calculates quadruplet interaction probabilities from break/make logits.
+
+        Ensures symmetry and combines probabilities assuming independence.
+
+        Args:
+            pairs_break (Tensor): Logits for breaking edges [MAX_ATOM, MAX_ATOM].
+            pairs_make (Tensor): Logits for making edges [MAX_ATOM, MAX_ATOM].
+
+        Returns:
+            Tensor: Sigmoid probabilities for quadruplet interactions
+                    [MAX_ATOM, MAX_ATOM, MAX_ATOM, MAX_ATOM].
+        """
         pairs_break = pairs_break.squeeze(0)
         pairs_make = pairs_make.squeeze(0)
         
-#         # Make the probability matrices symmetric
         pairs_break = (pairs_break + pairs_break.T) / 2
         pairs_make = (pairs_make + pairs_make.T) / 2
 
-#         # Calcular las probabilidades de destruir aristas para todas las combinaciones de quadrupletas
-#         prob_destruir = pairs_break.unsqueeze(2).unsqueeze(3) + pairs_break.unsqueeze(0).unsqueeze(1)
-
-#         # Calcular las probabilidades de crear aristas para todas las combinaciones de quadrupletas
-#         # Necesitamos reorganizar las dimensiones para alinear correctamente las aristas que se crearán
-#         prob_crear = - pairs_make.unsqueeze(1).unsqueeze(3) - pairs_make.unsqueeze(0).unsqueeze(2)
-
-        # Combinar las probabilidades de destruir y crear
+        # Combine the probabilities of destroy and create
         quadruplet_probabilities = pairs_break.unsqueeze(2).unsqueeze(3) + pairs_break.unsqueeze(0).unsqueeze(1) + pairs_make.unsqueeze(1).unsqueeze(3) + pairs_make.unsqueeze(0).unsqueeze(2)
-        
-        # print(quadruplet_probabilities.shape)
-
-        # Summing over the batch dimension if necessary
-#         quadruplet_probabilities = quadruplet_probabilities.sum(dim=0)
         
         quadruplet_probabilities = torch.sigmoid(quadruplet_probabilities)
         
         return quadruplet_probabilities
  
-class TimePredictionModel_graph(torch.nn.Module):
+class GINETimePredictor(torch.nn.Module):
+    """
+    Predicts a time-related scalar value for a graph using an Enhanced GINE
+    architecture.
+
+    Processes node features, edge features (including DOSD), global graph features,
+    and uses global mean pooling to obtain a graph-level representation for
+    the final prediction.
+
+    Inputs in `forward` (via `data` object):
+        - `data.x`: Node features [num_nodes, num_node_features]
+        - `data.edge_index`: Graph connectivity [2, num_edges]
+        - `data.edge_attr`: Edge features [num_edges, num_edge_features]
+        - `data.xA`: Global graph features [num_graphs, num_global_features]
+        - `data.distances`: Pairwise distances (unused in forward)
+        - `data.dosd_distances`: DOSD distances between nodes [MAX_ATOM, MAX_ATOM]
+        - `data.batch`: Batch assignment vector [num_nodes]
+
+    Outputs in `forward`:
+        - `x_out`: Predicted time value (scalar, sigmoid scaled to [0, 0.5]) [batch_size, 1]
+    """
     def __init__(self):
         super().__init__()
         nn1 = Sequential(Linear(NNFEAT, 2*NNFEAT), ReLU(), Linear(2*NNFEAT, 2*NNFEAT*2*NHEAD))
@@ -510,10 +524,7 @@ class TimePredictionModel_graph(torch.nn.Module):
         
         self.fc3 = nn.Linear(2*NNFEAT, 1)
 
-        # # Additional layers to process the concatenated embeddings
-        # self.fc_concat1 = Linear(2*NNFEAT + NGFEAT + 167, 256)  # You can adjust the size of 256 if needed
-        # self.fc_concat2 = Linear(256, 128)
-        # self.fc_output = nn.Linear(128, 1)
+
         
     def forward(self, data):
         x, edge_index, edge_attr, xA, distances, dosd_distances = data.x, data.edge_index, data.edge_attr, data.xA, data.distances, data.dosd_distances
@@ -522,7 +533,6 @@ class TimePredictionModel_graph(torch.nn.Module):
 
         # Add DOSD distances to edge attributes
         dosd_values = dosd_distances[edge_index[0], edge_index[1]].unsqueeze(1)
-        # print(dosd_values)
         edge_attr_added = torch.cat([edge_attr, dosd_values], dim=1)
         
         # GATN part
@@ -540,17 +550,23 @@ class TimePredictionModel_graph(torch.nn.Module):
         
         x_out = torch.sigmoid(self.fc3(x_gen)) * 0.5
 
-        # # Concatenate graph embedding with xA and maccs_fp
-        # # print(x_gen.shape, xA.shape, maccs_fp.shape)
-        # x_combined = torch.cat([x_gen, xA.unsqueeze(0), maccs_fp.unsqueeze(0)], dim=1)  # Concatenate along the feature dimension
-        
-        # # Pass through additional layers to get the final prediction
-        # x_combined = F.relu(self.fc_concat1(x_combined))
-        # x_combined = F.relu(self.fc_concat2(x_combined))
-        # x_out = torch.sigmoid(self.fc_output(x_combined)) * 0.5
         return x_out
 
-class TimePredictionModel_graph_fps_finetune(torch.nn.Module):
+class GINETimePredictor_MorganFP(torch.nn.Module):
+    """
+    Predicts a time-related scalar value for a graph using an Enhanced GINE
+    architecture, incorporating Morgan fingerprints.
+
+    Similar to `GINTimePredictor`, but concatenates processed Morgan
+    fingerprints to the graph-level representation before the final prediction layer.
+
+    Inputs in `forward` (via `data` object):
+        - All inputs from `GINTimePredictor`
+        - `data.morgan_fp`: Morgan fingerprints for the graph [num_graphs, morgan_fp_dim]
+
+    Outputs in `forward`:
+        - `x_out`: Predicted time value (scalar, sigmoid scaled to [0, 0.5]) [batch_size, 1]
+    """
     def __init__(self):
         super().__init__()
         nn1 = Sequential(Linear(NNFEAT, 2*NNFEAT), ReLU(), Linear(2*NNFEAT, 2*NNFEAT*2*NHEAD))
@@ -577,10 +593,6 @@ class TimePredictionModel_graph_fps_finetune(torch.nn.Module):
         
         self.fc3 = nn.Linear(2*NNFEAT, 1)
 
-        # # Additional layers to process the concatenated embeddings
-        # self.fc_concat1 = Linear(2*NNFEAT + NGFEAT + 167, 256)  # You can adjust the size of 256 if needed
-        # self.fc_concat2 = Linear(256, 128)
-        # self.fc_output = nn.Linear(128, 1)
         
     def forward(self, data):
         x, edge_index, edge_attr, xA, distances, dosd_distances, morgan_fp = data.x, data.edge_index, data.edge_attr, data.xA, data.distances, data.dosd_distances, data.morgan_fp
@@ -589,7 +601,6 @@ class TimePredictionModel_graph_fps_finetune(torch.nn.Module):
 
         # Add DOSD distances to edge attributes
         dosd_values = dosd_distances[edge_index[0], edge_index[1]].unsqueeze(1)
-        # print(dosd_values)
         edge_attr_added = torch.cat([edge_attr, dosd_values], dim=1)
         
         # GATN part
@@ -615,12 +626,4 @@ class TimePredictionModel_graph_fps_finetune(torch.nn.Module):
         
         x_out = torch.sigmoid(self.fc3(x_in)) * 0.5
 
-        # # Concatenate graph embedding with xA and maccs_fp
-        # # print(x_gen.shape, xA.shape, maccs_fp.shape)
-        # x_combined = torch.cat([x_gen, xA.unsqueeze(0), maccs_fp.unsqueeze(0)], dim=1)  # Concatenate along the feature dimension
-        
-        # # Pass through additional layers to get the final prediction
-        # x_combined = F.relu(self.fc_concat1(x_combined))
-        # x_combined = F.relu(self.fc_concat2(x_combined))
-        # x_out = torch.sigmoid(self.fc_output(x_combined)) * 0.5
         return x_out

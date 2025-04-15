@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from lib_functions.sample_utils import calculate_data_molecule_fps, sample_step_graph
 from lib_functions.libraries import *
 from lib_functions.config import *
-from lib_functions.models import GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2_morgan_finetune_2,  TimePredictionModel_graph_fps_finetune
+from lib_functions.models import GINEdgeQuadrupletPredictor_MorganFP,  GINETimePredictor_MorganFP
 from lib_functions.data_preparation_utils import embed_edges_manuel
 from lib_functions.adjacency_utils import components_to_graph
 from lib_functions.data_loader import build_dataset_alejandro
@@ -207,8 +207,8 @@ if __name__ == "__main__":
     os.makedirs(molsgen_dir_temporal, exist_ok=True)
 
     # load the models
-    model = GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2_morgan_finetune_2()
-    time_model = TimePredictionModel_graph_fps_finetune()
+    model = GINEdgeQuadrupletPredictor_MorganFP()
+    time_model = GINETimePredictor_MorganFP()
 
     # try to load the models
     try:

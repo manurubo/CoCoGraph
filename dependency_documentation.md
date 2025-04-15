@@ -46,9 +46,9 @@ This document outlines the function dependencies across the project files.
   - Creates: Tensors representing swaps
 - `generate_swap_tensors_optimized(final_swaps, num_nodes=MAX_ATOM, device=device)`
   - Optimized version of `generate_swap_tensors()`
-- `genera_intermedio(graph, deshacer_l)`
+- `genera_intermedio(graph, swaps_to_undo)`
   - Manipulates: NetworkX graph
-- `compute_features(graph, num, deshacer_l)`
+- `compute_features(graph, num, swaps_to_undo)`
   - Calls:
     - `genera_intermedio()`
     - `embed_edges_manuel()` from `data_preparation_utils`
@@ -62,9 +62,9 @@ This document outlines the function dependencies across the project files.
   - Core training/inference logic
 
 ### main_time_pred.py
-- `genera_intermedio(graph, deshacer_l)`
+- `genera_intermedio(graph, swaps_to_undo)`
   - Manipulates graph by swapping edges
-- `compute_features(graph, num, deshacer_l)`
+- `compute_features(graph, num, swaps_to_undo)`
   - Calls:
     - `genera_intermedio()`
     - `embed_edges_manuel()`
@@ -73,7 +73,7 @@ This document outlines the function dependencies across the project files.
     - `calculate_2d_distances_ordered()`
 - `compute_features_cero(grafo_i)`
   - Similar to `compute_features()` but without transformations
-- `compute_features_timepred(graph, num, deshacer_l)`
+- `compute_features_timepred(graph, num, swaps_to_undo)`
   - Calls:
     - `genera_intermedio()`
     - `embed_graph_nodes_norm_timepred()`
@@ -82,7 +82,7 @@ This document outlines the function dependencies across the project files.
 - `main(train_dl, test_dl, model, checkpoint, executor, slice, epoch, saca_grafo, inversa)`
   - Sets up optimizer and scheduler
   - Handles training and validation loops
-  - Uses: `TimePredictionModel_graph` from `models.py`
+  - Uses: `GINETimePredictor` from `models.py`
   - Uses `connected_double_edge_swap()` from `adjacency_utils`
 
 ### sample-fast-molecularformula-multimolecule_compartefm.py
@@ -135,7 +135,7 @@ This document outlines the function dependencies across the project files.
   - Counts cycles by size in the graph
 
 ### adjacency_utils.py
-- `generate_mask2(adjacency_matrix, target)`
+- `generate_padding_mask(adjacency_matrix, target)`
   - Creates mask for adjacency matrix
 - `connected_double_edge_swap(G, nswap=1, _window_threshold=3)`
   - Performs edge swaps in graph
@@ -158,12 +158,12 @@ This document outlines the function dependencies across the project files.
 
 ### models.py
 - `GATN` - Base Graph Attention Network
-- `GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2` - Enhanced GNN model
+- `GINEdgeQuadrupletPredictor` - Enhanced GNN model
   - Forward method calls multiple internal submodules:
     - GIN layers
     - Linear transformations
     - Pooling operations
-- `TimePredictionModel_graph` - Time prediction GNN model
+- `GINETimePredictor` - Time prediction GNN model
   - Used in `main_time_pred.py`
   - Predicts diffusion time step
 
@@ -196,7 +196,7 @@ Defines constants:
    - `losses.py` - For custom loss functions
 
 4. The core models are defined in `models.py`, with the primary ones being:
-   - `GATN_35_onlyGNNv3_quadlogits_EnhancedGIN_edges_DosD_v2` - Main generative model
-   - `TimePredictionModel_graph` - Time prediction model
+   - `GINEdgeQuadrupletPredictor` - Main generative model
+   - `GINETimePredictor` - Time prediction model
 
 5. Configuration constants are defined in `config.py` and imported through `libraries.py`. 

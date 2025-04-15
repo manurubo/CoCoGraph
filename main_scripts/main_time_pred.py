@@ -1,7 +1,7 @@
 from lib_functions.libraries import *
 from lib_functions.config import *
 
-from lib_functions.models import TimePredictionModel_graph
+from lib_functions.models import GINETimePredictor
 from lib_functions.data_preparation_utils import compute_features, compute_features_cero, save_plot_data
 from lib_functions.adjacency_utils import connected_double_edge_swap
 from lib_functions.data_loader import build_dataset_alejandro
@@ -282,7 +282,7 @@ if __name__ == "__main__":
     os.makedirs(resultados_dir, exist_ok=True)
     
     # Create the model
-    model = TimePredictionModel_graph() 
+    model = GINETimePredictor() 
     
     # Load the checkpoint if available
     if (args.epoch == 0) & (args.slice == 0):
