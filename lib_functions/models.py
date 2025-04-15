@@ -1,18 +1,16 @@
 from lib_functions.libraries import *
 from lib_functions.config import *
-import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.nn import Linear, Sequential, ReLU
-from torch_geometric.nn import GATConv, GATv2Conv, GCNConv, GINEConv, global_add_pool, global_max_pool, global_mean_pool
+from torch_geometric.nn import  GINEConv, global_max_pool, global_mean_pool
 
-from typing import Callable, Optional, Union
+from typing import  Optional, Union
 from torch_geometric.typing import (
     Adj,
     OptPairTensor,
     OptTensor,
     Size,
-    SparseTensor,
 )
 from torch import Tensor
 

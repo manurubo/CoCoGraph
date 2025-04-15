@@ -1,11 +1,6 @@
 from lib_functions.config import *
 from lib_functions.libraries import *
-import numpy as np
-import networkx as nx
 from rdkit import Chem
-import torch
-from copy import deepcopy
-import math  # Added import math
 
 
 def pad_adjs(ori_adj, node_number):
@@ -100,19 +95,6 @@ def count_bond_types(adj):
     double_bonds = np.count_nonzero(adj == 2)
     triple_bonds = np.count_nonzero(adj == 3)
     return [no_bonds-adj.shape[0], single_bonds, double_bonds, triple_bonds], adj.shape[0]
-
-
-def round_half_up(x):
-    """
-    Rounds a tensor to the nearest integer, with halves rounded up.
-
-    Args:
-        x (torch.Tensor): Input tensor.
-
-    Returns:
-        torch.Tensor: Rounded tensor.
-    """
-    return torch.floor(x + 0.5) 
 
 
 def nx_to_rdkit(graph, hidrogenos = False):
@@ -353,7 +335,7 @@ def genera_intermedio(graph, swaps_to_undo):
         Modified graph after applying the swaps
     """
     dk = [n for n, d in graph.degree()]
-    for d in swaps_to_undo:
+    for d in deshacer_l:
         u = dk[d[0][0]]
         v = dk[d[0][1]]
         x = dk[d[1][0]]

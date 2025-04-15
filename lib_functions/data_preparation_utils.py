@@ -1,18 +1,15 @@
 from lib_functions.config import *
 from lib_functions.adjacency_utils import  pad_adjs, count_bond_types
-import numpy as np
-import networkx as nx
-from rdkit import Chem
-import itertools
 from lib_functions.adjacency_utils import nx_to_rdkit
-from itertools import permutations, combinations
-import pandas as pd
-import scipy
 
 from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')
 
 from lib_functions.adjacency_utils import genera_intermedio
+
+from rdkit.Chem import AllChem
+import json
+
 
 
 
@@ -339,9 +336,6 @@ def embed_edges_manuel(g,node_list):
     return emb, bonds_num, num_atoms
 
 
-import numpy as np
-from datetime import datetime
-
 def all_simple_cycles(G):
     """Finds all simple cycles in a NetworkX graph.
 
@@ -490,7 +484,6 @@ def embed_edges_with_cycle_sizes_norm(g, cycle_max=14):
     return torch.LongTensor(edges).transpose(1, 0), torch.Tensor(edge_attributes)
 
 
-from rdkit.Chem import AllChem
 
 
 def calculate_2d_distances_ordered(graph, original_node_order):
@@ -657,7 +650,6 @@ def save_plot_data(data, filename):
         data: The data structure (e.g., dict, list) to save.
         filename (str): Path to the output JSON file.
     """
-    import json
     with open(filename, 'w') as f:
         json.dump(data, f)
 

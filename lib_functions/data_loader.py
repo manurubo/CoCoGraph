@@ -1,9 +1,6 @@
 from lib_functions.config import *
 from lib_functions.data_preparation_utils import embed_edges_manuel, smiles_to_graph
-import numpy as np
 from tqdm import tqdm
-import networkx as nx
-import torch
 from torch.utils.data import Dataset, DataLoader, TensorDataset, DataLoader
 from func_timeout import func_timeout
 

@@ -1,9 +1,5 @@
-import pickle
-import gc
 import os
 import sys
-import argparse
-
 # Add the parent directory to the Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -15,23 +11,18 @@ from lib_functions.data_preparation_utils import embed_edges_manuel
 from lib_functions.data_loader import build_dataset_alejandro
 from lib_functions.adjacency_utils import components_to_graph
 from lib_functions.adjacency_utils import nx_to_rdkit
+from lib_functions.adjacency_utils import connected_double_edge_swap
+
 from rdkit import Chem
 from copy import deepcopy
-
+import gc
+import argparse
 import random 
-
-import os
-
-from lib_functions.adjacency_utils import connected_double_edge_swap
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor
 
 from rdkit import RDLogger
 RDLogger.DisableLog('rdApp.*')
-
-import multiprocessing
-
-from concurrent.futures import ProcessPoolExecutor
-
-import time
 
 
 def process_batch(conjunto, model, num, b_molecule, cantidad, time_model):
@@ -177,7 +168,6 @@ def process_batch(conjunto, model, num, b_molecule, cantidad, time_model):
     return df_generated_temporal
     
 
-import argparse
 
 if __name__ == "__main__":
     

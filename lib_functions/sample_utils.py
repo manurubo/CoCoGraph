@@ -1,9 +1,6 @@
 from lib_functions.adjacency_utils import components_to_graph, nx_to_rdkit
 from lib_functions.config import *
 from lib_functions.libraries import *
-import torch
-import itertools
-
 from lib_functions.data_preparation_utils import embed_edges_manuel, embed_edges_with_cycle_sizes_norm, smiles_to_graph, embed_graph_nodes_norm, calculate_2d_distances_ordered
 from rdkit.Chem import AllChem
 

@@ -4,9 +4,8 @@ from lib_functions.config import *
 from lib_functions.models import GINEdgeQuadrupletPredictor, GINEdgeQuadrupletPredictor_MorganFP
 from lib_functions.losses import loss_func_vs_inicio
 from lib_functions.data_preparation_utils import compute_features_fps, save_plot_data
-from lib_functions.adjacency_utils import generate_padding_mask, connected_double_edge_swap, nx_to_rdkit
+from lib_functions.adjacency_utils import generate_padding_mask, connected_double_edge_swap
 from lib_functions.data_preparation_utils import generate_swap_tensors_optimized
-
 from lib_functions.data_loader import build_dataset_alejandro
 
 import random 
@@ -14,10 +13,6 @@ import os
 from copy import deepcopy
 import concurrent.futures
 import gc 
-from rdkit.Chem import AllChem
-from multiprocessing import Pool
-
-import gc
 import argparse
 
 
