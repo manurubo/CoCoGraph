@@ -34,7 +34,7 @@ def main():
     
     args = parser.parse_args()
 
-    with open('Data/TotalSmilesTogether.pickle', 'rb') as inf:
+    with open('Data/training_smiles.pickle', 'rb') as inf:
         df = load(inf)
         df = df.sample(frac=1, random_state=1111).reset_index(drop=True)
 

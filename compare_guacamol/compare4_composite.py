@@ -7,14 +7,12 @@ import os
 import argparse
 from itertools import combinations
 
-from rdkit import Chem, DataStructs
-from rdkit.Chem import AllChem, Descriptors, QED, rdMolDescriptors
+from rdkit import Chem
+from rdkit.Chem import Descriptors
 
 import numpy as np
 from scipy.stats import entropy
-from scipy.interpolate import interp1d
 from scipy.stats import gaussian_kde
-
 
 import logging
 
@@ -65,15 +63,12 @@ def calculate_descriptors(mol):
         for desc_name in DESCRIPTORS:
             descriptor_values[desc_name] = calc[desc_name]
 
-
-        
     except Exception as e:
         logger.error(f"Error calculating descriptors for molecule: {e}")
         # Assign NaN for all descriptors in case of error
         for desc in DESCRIPTORS:
             descriptor_values[desc] = np.nan
 
-    
     return descriptor_values
 
 # Function to get molecules from SMILES
@@ -150,11 +145,7 @@ else:
     comparisons = [(selected_categories[0], selected_categories[1])]
 
 str_date = directories[0]
-print(str_date)
 
-import pickle
-
-print(args.load_descriptors)
 if args.load_descriptors:
     # Load pre-calculated descriptors
     df_combined = pd.read_csv(f'mols_gen/{str_date}/combined_molecules_with_descriptors_100K_all.csv') # tambien version 100K
@@ -162,15 +153,17 @@ if args.load_descriptors:
 else:
     # Read CSV files
     df = pd.read_csv(f'mols_gen/{str_date}/all_generated_molecules.csv')
-    df_jtvae = pd.read_csv(f'Data/new_jtvae_molecules.csv')
-    df_digress = pd.read_csv(f'Data/new_digress_molecules.csv')
-    # df_real = pd.read_csv(f'mols_gen/{str_date}/real_molecules_solotrain.csv')  # Uncomment if needed
+    df_jtvae = pd.read_csv(f'../Data/jtvae_generated_filtered.csv')
+    df_digress = pd.read_csv(f'../Data/digress_generated_filtered.csv')
 
-    df_molecules = pd.read_csv('Data/molecular_formulas.csv')
+
+    df_molecules = pd.read_csv('../Data/molecules_lt70atoms_annotated.csv')
     df_molecules = df_molecules.sample(frac=1, random_state=1111).reset_index(drop=True)
 
-    # para trabajar con whole random 10000
+    # Select 100000 random molecules from the original dataset
     selected_smiles = df_molecules.sample(n=100000, random_state=1111)['smiles'].tolist()
+
+    # Select 15000 random molecules from the generated dataset
     selected_smiles_gen = df.sample(n=15000, random_state=1111)['smiles'].tolist()
 
     # Separate the dataframe into original, generated, etc.
@@ -178,21 +171,18 @@ else:
     df_gen = pd.DataFrame({'smiles_gen': selected_smiles_gen})
     df_jtvae = df_jtvae[['smiles_jtvae']]
     df_digress = df_digress[['smiles_digress']]
-    # df_real = df_real[['smiles_real']]  # Uncomment if needed
 
     # Rename columns to have the same name across dataframes
     df_ori = df_ori.rename(columns={'smiles_ori': 'smiles'})
     df_gen = df_gen.rename(columns={'smiles_gen': 'smiles'})
     df_jtvae = df_jtvae.rename(columns={'smiles_jtvae': 'smiles'})
     df_digress = df_digress.rename(columns={'smiles_digress': 'smiles'})
-    # df_real = df_real.rename(columns={'smiles_real': 'smiles'})  # Uncomment if needed
 
     # Add a column to indicate the category
     df_ori['category'] = 'ori'
     df_gen['category'] = 'gen_' + str_date
     df_jtvae['category'] = 'jtvae'
     df_digress['category'] = 'digress'
-    # df_real['category'] = 'real'  # Uncomment if needed
 
     # Reset index for each DataFrame
     df_ori = df_ori.reset_index(drop=True)
@@ -207,11 +197,8 @@ else:
 
     # Compute descriptors for each category DataFrame
     def add_descriptors(df_subset, smiles_column):
-        print(df_subset.columns)
-        print(df_subset.head())
         
         descriptors_df = compute_all_descriptors(df_subset['smiles'])
-        print(descriptors_df.head())
         df_subset = pd.concat([df_subset, descriptors_df], axis=1)
         return df_subset
 
@@ -219,7 +206,6 @@ else:
     df_gen = add_descriptors(df_gen, 'smiles')
     df_jtvae = add_descriptors(df_jtvae, 'smiles')
     df_digress = add_descriptors(df_digress, 'smiles')
-    # df_real = add_descriptors(df_real, 'smiles')  # Uncomment if needed
 
     # Concatenate all DataFrames
     df_combined = pd.concat([df_ori, df_gen, df_jtvae, df_digress], axis=0).reset_index(drop=True)
@@ -227,8 +213,6 @@ else:
     # Save the combined dataframe with descriptors for future use
     df_combined.to_csv(f'mols_gen/{str_date}/combined_molecules_with_descriptors_100K_all.csv', index=False)
 
-# Now concatenate all subsets
-#df_combined = pd.concat([df_ori, df_gen, df_jtvae, df_digress], axis=0).reset_index(drop=True)
 
 # If there are additional directories, process them
 contador = 1
@@ -242,11 +226,8 @@ if len(directories) > 1:
         df_combined = pd.concat([df_combined, df_gen_new], axis=0).reset_index(drop=True)
         contador += 1
 
-
 # Save the combined dataframe (optional)
 df_combined.to_csv(f'mols_gen/{str_date}/combined_molecules_with_descriptors.csv', index=False)
-
-print(comparisons)
 
 # Define the list of descriptors to compare
 columns_to_compare = DESCRIPTORS.copy() 
@@ -275,7 +256,6 @@ categorical_features = [
 
 import numpy as np
 from scipy.stats import entropy
-from scipy.interpolate import interp1d
 
 def jensen_shannon_distance(distribution1, distribution2):
     """
@@ -387,10 +367,8 @@ def calculate_js_distances_with_histograms(df, categories, features, cat_feature
         for i in range(len(categories)):
             for j in range(i + 1, len(categories)):
                 if feature in cat_features:
-                    print(feature)
                     # Get unique values for the feature
                     unique_values = df[feature].dropna().unique()
-                    print(unique_values)
 
                     # Initialize the probability distributions
                     prob_distributions = {category: [] for category in categories}
@@ -403,7 +381,6 @@ def calculate_js_distances_with_histograms(df, categories, features, cat_feature
                         for value in unique_values:
                             prob_distributions[category].append(counts.get(value, 0) / total_count)
                        
-                    print(prob_distributions)
                     category1 = categories[i]
                     category2 = categories[j]
 
@@ -421,11 +398,9 @@ def calculate_js_distances_with_histograms(df, categories, features, cat_feature
                         'JS_Distance': js_distance
                     })
                 else:
-                    print(feature)
                     category1 = categories[i]
                     category2 = categories[j]
 
-                    print(category1,category2)
 
                     # Extract data for the two categories
                     data1 = df[df['category'] == category1][feature].dropna()
@@ -826,7 +801,6 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
 
     # Now, create the log JS ratios plot on the top-right axis (ax_log) with vertical orientation
     pd.set_option('display.max_columns', None)
-    print(js_distances[['Feature', 'Category1', 'Category2', 'JS_Distance']])
     pd.reset_option('display.max_columns')
     js_ratios_digress = []
     js_ratios_jtvae = []

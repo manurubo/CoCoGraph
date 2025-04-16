@@ -148,7 +148,7 @@ After training, you can generate new molecules using the sampling scripts locate
 1.  **With BASE models** (trained without fingerprints):
     ```bash
     python sample_scripts/sample_molecules_BASEmodel.py \
-           --input_smiles_csv Data/molecular_formulas.csv \
+           --input_smiles_csv Data/molecules_lt70atoms_annotated.csv \
            --output_dir_suffix BASE_run_1 \
            --model_checkpoint_path models/BASE/model_epoch_X.pth \
            --time_model_checkpoint_path models/BASE_time/model_epoch_Y.pth \
@@ -161,7 +161,7 @@ After training, you can generate new molecules using the sampling scripts locate
 2.  **With FPS models** (trained with fingerprints):
     ```bash
     python sample_scripts/sample_molecules_FPSmodel.py \
-           --input_smiles_csv Data/molecular_formulas.csv \
+           --input_smiles_csv Data/molecules_lt70atoms_annotated.csv \
            --output_dir_suffix FPS_run_1 \
            --model_checkpoint_path models/FPS/model_epoch_X.pth \
            --time_model_checkpoint_path models/FPS_time/model_epoch_Y.pth \
@@ -181,7 +181,7 @@ The sampling process:
 5.  Saves results periodically and cumulatively in a directory under `mols_gen/` named with the `--output_dir_suffix`.
 
 Key sampling parameters configurable via command-line arguments:
--   `--input_smiles_csv`: Path to the input CSV file containing SMILES strings (default: `Data/molecular_formulas.csv`).
+-   `--input_smiles_csv`: Path to the input CSV file containing SMILES strings (default: `Data/molecules_lt70atoms_annotated.csv`).
 -   `--output_dir_suffix`: Suffix for the output directory where generated molecules and logs will be saved (default depends on the script).
 -   `--model_checkpoint_path`: Path to the trained diffusion model checkpoint.
 -   `--time_model_checkpoint_path`: Path to the trained time prediction model checkpoint.

@@ -173,7 +173,7 @@ if __name__ == "__main__":
     
     # Create the parser
     parser = argparse.ArgumentParser(description='Molecular generation script using CoCoGraph (non-FPS version).')
-    parser.add_argument('--input_smiles_csv', type=str, default='Data/molecular_formulas.csv', help='Path to the input CSV file containing SMILES.')
+    parser.add_argument('--input_smiles_csv', type=str, default='Data/molecules_lt70atoms_annotated.csv', help='Path to the input CSV file containing SMILES.')
     parser.add_argument('--output_dir_suffix', type=str, default='Prueba_CoCoGraph_2', help='Suffix for the output directory name.')
     parser.add_argument('--model_checkpoint_path', type=str, default='models/241030_allmolecules_ffnet/model_epoch_2_slice_22.pth', help='Path to the main model checkpoint.')
     parser.add_argument('--time_model_checkpoint_path', type=str, default='models/241017_all_timepred/model_epoch_2_slice_22.pth', help='Path to the time prediction model checkpoint.')
