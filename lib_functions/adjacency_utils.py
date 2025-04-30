@@ -335,7 +335,7 @@ def genera_intermedio(graph, swaps_to_undo):
         Modified graph after applying the swaps
     """
     dk = [n for n, d in graph.degree()]
-    for d in deshacer_l:
+    for d in swaps_to_undo:
         u = dk[d[0][0]]
         v = dk[d[0][1]]
         x = dk[d[1][0]]
