@@ -32,6 +32,10 @@ The repository is organized as follows:
 - **Data/**: Contains datasets used in the scripts
   - Molecular databases in pickle format
   - Molecular formulas for generation
+  - **generated_database/**: Contains large synthetic molecular databases.
+    - `all_molecules.csv`: A comprehensive database of 8.2 million generated molecules.
+    - `novel_molecules.csv`: A subset of `all_molecules.csv` containing 7.6 million unique and novel molecules.
+    *Note: These files are managed with Git LFS due to their size.*
 
 - **lib_functions/**: Contains helper functions used throughout the codebase
   - `adjacency_utils.py`: Utilities for handling molecule adjacency matrices
