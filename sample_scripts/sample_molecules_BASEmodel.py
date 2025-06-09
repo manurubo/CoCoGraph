@@ -269,14 +269,8 @@ if __name__ == "__main__":
             # Map process_batch function over all batches   
             futures = []
             for num, conjunto in enumerate(train_dl):
-                # Pass quantity explicitly if needed inside process_batch
-                future = executor_gpu.submit(process_batch, conjunto, model, num, total_batches_processed, quantity, time_model)
-                futures.append(future)
-
-            for i, future in enumerate(futures):
-                df_generated_batch_slice = future.result()
-                batch_num_within_epoch = i
-                df_generated_batch_slice.to_csv(f"{molsgen_dir_temporal}/batch_{total_batches_processed}_{batch_num_within_epoch}_generated_molecules.csv", index=False) # save the generated molecules for each batch slice
+                df_generated_batch_slice = process_batch(conjunto, model, num, total_batches_processed, quantity, time_model) # Pass new arg
+                df_generated_batch_slice.to_csv(f"mols_gen/{str_date}/batch_{total_batches_processed}_{num}_generated_molecules.csv", index=False)
                 df_generated_batch = df_generated_batch._append(df_generated_batch_slice, ignore_index=True)
         
         # Save intermediate results for the whole sampling batch

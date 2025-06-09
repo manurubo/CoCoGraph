@@ -43,9 +43,11 @@ def main():
 
     current_slice = args.slice # Initialize current_slice with the provided slice argument
 
-    print(f"Starting epoch {args.epoch} from index {args.start_index} with batch size {batch_size}, initial slice {current_slice}")
+    start_index = args.start_index + current_slice * batch_size
 
-    for start_index_loop in range(args.start_index, total_molecules, batch_size):
+    print(f"Starting epoch {args.epoch} from index {start_index} with batch size {batch_size}, initial slice {current_slice}")
+
+    for start_index_loop in range(start_index, total_molecules, batch_size):
         print(f"Processing batch starting at index: {start_index_loop}, slice: {current_slice}")
         run_script(start_index_loop, batch_size, current_slice, args.epoch)
         current_slice += 1

@@ -115,7 +115,8 @@ def main(train_dl, model, checkpoint, executor, slice, epoch):
                         dosd = torch.Tensor(dosd)
                         # Create a Data element on the dataset for each graph
                         dataset.append(Data(x=nemb, edge_index=edge_index, xA=gemb, edge_attr=edge_attr, noiselevel=nl, distances=distances, final_entrada = ruido, dosd_distances = dosd))
-                        nls = torch.Tensor(nls).to(device)
+                    # Convert the list of noise levels to a tensor and move it to the device
+                    nls = torch.Tensor(nls).to(device)
 
                     # Zero the gradients
                     optimizer.zero_grad()

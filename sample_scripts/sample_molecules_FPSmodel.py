@@ -266,17 +266,9 @@ if __name__ == "__main__":
             # Map process_batch function over all batches   
             futures = []
             for num, conjunto in enumerate(train_dl):
-                # Pass args.batch_size_process explicitly to process_batch if needed,
-                # or ensure process_batch uses the 'cantidad' parameter correctly
-                # Currently 'cantidad' is passed but not used inside process_batch
-                future = executor_gpu.submit(process_batch, conjunto, model, num, total_batches_processed, quantity, time_model)
-                futures.append(future)
-
-            for i, future in enumerate(futures):
-                df_generated_batch_slice = future.result()
-                batch_num_within_epoch = i # Use loop index for clarity
-                df_generated_batch_slice.to_csv(f"{molsgen_dir_temporal}/batch_{total_batches_processed}_{batch_num_within_epoch}_generated_molecules.csv", index=False) # save the generated molecules for each batch slice
-                df_generated_batch = df_generated_batch._append(df_generated_batch_slice, ignore_index=True) # append the generated molecules to the total dataframe
+                df_generated_batch_slice = process_batch(conjunto, model, num, total_batches_processed, quantity, time_model) # Pass new arg
+                df_generated_batch_slice.to_csv(f"mols_gen/{str_date}/batch_{total_batches_processed}_{num}_generated_molecules.csv", index=False)
+                df_generated_batch = df_generated_batch._append(df_generated_batch_slice, ignore_index=True)
 
         # Save intermediate results for the whole sampling batch
         df_generated_batch.to_csv(f"{molsgen_dir}/generated_molecules_batch_{total_batches_processed}.csv", index=False) # save the generated molecules for each sampling batch

@@ -1,3 +1,11 @@
+import subprocess
+import os
+import sys
+import argparse
+
+# Add the parent directory to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import pandas as pd
 from tableone import TableOne
 import seaborn as sns
@@ -183,10 +191,10 @@ if args.load_descriptors:
 else:
     # Read CSV files
     df = pd.read_csv(f'mols_gen/{str_date}/all_generated_molecules.csv')
-    df_jtvae = pd.read_csv(f'../Data/jtvae_generated_filtered.csv')  # Updated path
-    df_digress = pd.read_csv(f'../Data/digress_generated_filtered.csv')  # Updated path
+    df_jtvae = pd.read_csv(f'Data/jtvae_generated_filtered.csv')  # Updated path
+    df_digress = pd.read_csv(f'Data/digress_generated_filtered.csv')  # Updated path
 
-    df_molecules = pd.read_csv('../Data/molecules_lt70atoms_annotated.csv')  # Updated path
+    df_molecules = pd.read_csv('Data/molecules_lt70atoms_annotated.csv')  # Updated path
     df_molecules = df_molecules.sample(frac=1, random_state=1111).reset_index(drop=True)
 
     # Select 100000 random molecules from the original dataset
@@ -582,7 +590,7 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
     # Plot distributions for each of the 6 randomly selected features
     for idx, (ax, feature) in enumerate(zip(distribution_axes, selected_features)):
         # Add letter label to each subplot
-        letter = chr(65 + idx)  # A, B, C, etc.
+        letter = chr(97 + idx)  # a, b, c, etc.
         ax.text(0.02, 0.98, letter, transform=ax.transAxes, fontsize=28, 
                 fontweight='bold', va='top', ha='left', fontname='Nimbus Sans')
 
@@ -848,7 +856,7 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
     sns.despine()
     
     # Add letter label to the log2 ratio plot (will be the last letter)
-    last_letter = chr(65 + len(distribution_axes))  # After all distribution plots
+    last_letter = chr(97 + len(distribution_axes))  # After all distribution plots
     ax_log.text(0.02, 0.98, last_letter, transform=ax_log.transAxes, fontsize=28, 
                fontweight='bold', va='top', ha='left', fontname='Nimbus Sans')
     
