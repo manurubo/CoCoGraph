@@ -369,10 +369,10 @@ The evaluation scripts generate several output files in `mols_gen/{your_director
 If you use CoCoGraph in your research, please cite our paper:
 
 ```
-@article{ruiz2023cocograph,
-  title={CoCoGraph: A collaborative constrained graph diffusion model for the generation of realistic synthetic molecules},
+@article{ruiz2025cocograph,
+  title={A collaborative constrained graph diffusion model for the generation of realistic synthetic molecules},
   author={Ruiz-Botella, Manuel and Sales-Pardo, Marta and Guimerà, Roger},
-  journal={},
+  journal={arXiv:2505.16365},
   year={2025}
 }
 ```
