@@ -12,18 +12,109 @@ CoCoGraph introduces a novel approach to molecular generation using a collaborat
 
 CoCoGraph achieves 100% chemical validity in generated molecules and significantly outperforms state-of-the-art approaches on the Guacamol benchmark while requiring an order of magnitude fewer parameters.
 
-## Environment Setup
+## System Requirements
 
-To run CoCoGraph, you need to create a Python environment with the required dependencies:
+### Software Dependencies
+- **Python**: 3.9.x
+- **PyTorch**: ≥1.12.0
+- **RDKit**: ≥2022.03.1
+- **NumPy**: ≥1.21.0
+- **Pandas**: ≥1.4.0
+- **Scikit-learn**: ≥1.1.0
+- **Matplotlib**: ≥3.5.0
+- **Seaborn**: ≥0.11.0
+- **Tqdm**: ≥4.64.0
 
-```bash
-# Create a new conda environment
-conda create -n cocograph python=3.9
-conda activate cocograph
+### Operating Systems Tested
+- Ubuntu 20.04 LTS
+- Ubuntu 22.04 LTS
 
-# Install dependencies using the requirements file
-pip install -r requirements_vast.txt
-```
+### Hardware Requirements
+- **Minimum**: 8 GB RAM, 4 CPU cores
+- **Recommended**: 16+ GB RAM, 8+ CPU cores, GPU with 8+ GB VRAM
+- **Storage**: 10+ GB free disk space for models and generated molecules
+
+### Non-standard Hardware
+- CUDA-capable GPU recommended for training (optional for inference)
+- Training large models may require GPUs with 16+ GB VRAM
+
+## Installation Guide
+
+### Instructions
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/manurubo/CoCoGraph.git
+   cd CoCoGraph
+   ```
+
+2. **Create and activate conda environment**:
+   ```bash
+   conda create -n cocograph python=3.9
+   conda activate cocograph
+   ```
+
+3. **Install dependencies**:
+   ```bash
+   pip install -r requirements_vast.txt
+   ```
+
+4. **Verify installation**:
+   ```bash
+   python -c "import torch; import rdkit; print('Installation successful!')"
+   ```
+
+### Typical Install Time
+- **On a normal desktop computer**: 10-15 minutes
+- Note: Initial conda environment creation and package downloads may take longer on slower connections
+
+## Demo
+
+### Instructions to Run Demo
+
+We provide a quick demo using a small subset of molecules to test the installation and basic functionality:
+
+1. **Generate a small set of molecules using pre-trained models**:
+   ```bash
+   # Demo with BASE model (uses first 100 molecules from dataset)
+   python sample_scripts/sample_molecules_BASEmodel.py \
+          --input_smiles_csv Data/molecules_lt70atoms_annotated.csv \
+          --output_dir_suffix demo_run \
+          --model_checkpoint_path models/BASE_diffusion/model_epoch_2_slice_22.pth \
+          --time_model_checkpoint_path models/BASE_time/model_epoch_2_slice_22.pth \
+          --batch_size_sample 100 \
+          --batch_size_process 5 \
+          --save_every_n_batches 1 \
+          --num_workers 2
+   ```
+
+2. **Evaluate demo results**:
+   ```bash
+   # Property distribution analysis (comparing generated molecules to original dataset and baselines)
+   python compare_guacamol/compare4_composite.py \
+          -gen -ori -jtvae -digress \
+          --reference ori \
+          --directory demo_run
+   
+   # Guacamol benchmark evaluation (if you want standard benchmarks)
+   python compare_guacamol/compare4_guacamol_composite.py \
+          -gen -ori -jtvae -digress \
+          --reference ori \
+          --directory demo_run
+   ```
+
+### Expected Output
+- **Generated molecules**: 10 new molecules saved in `mols_gen/demo_run/`
+- **Validity**: 100% (all generated molecules are chemically valid)
+- **Log files**: Training progress and generation statistics
+- **Property distributions**: Basic molecular property analysis
+
+### Expected Runtime for Demo
+- **On a normal desktop computer**: 2-5 minutes
+- **With GPU acceleration**: 1-2 minutes
+- **CPU only**: 5-10 minutes
+
+
 
 ## Directory Structure
 
@@ -53,11 +144,13 @@ The repository is organized as follows:
   - `main_time_pred*.py`: Scripts for training the time prediction model
 
 - **sample_scripts/**: Contains scripts for generating molecules once models are trained
-  - `sample-fast-molecularformula-multimolecule_*.py`: Scripts for molecule generation
+  - `sample_molecules_BASEmodel.py`: Script for molecule generation using BASE models (without fingerprints)
+  - `sample_molecules_FPSmodel.py`: Script for molecule generation using FPS models (with fingerprints)
 
 - **compare_guacamol/**: Used to compare results and generate graphs for the paper
+  - `compare4_composite.py`: Property distribution analysis and visualization script  
+  - `compare4_guacamol_composite.py`: Guacamol benchmark evaluation script
   - Benchmarking scripts against other models (JTVAE, DiGress)
-  - Visualization scripts for molecular properties
 
 - **models/**: Contains trained model weights
   - BASE models (without fingerprints)
@@ -200,22 +293,76 @@ Make sure to replace `model_epoch_X.pth` and `model_epoch_Y.pth` with the actual
 
 To evaluate generated molecules and reproduce the paper's results:
 
-1. **Property Distribution Analysis**:
-   ```bash
-   python compare_guacamol/compare4_composite.py
-   ```
-   This script compares distributions of molecular properties between generated and real molecules.
+### Evaluation Scripts Parameters
 
-2. **Benchmark Evaluation**:
-   ```bash
-   python compare_guacamol/compare4_guacamol_composite.py
-   ```
-   This script evaluates generated molecules against the Guacamol benchmark, comparing with JTVAE and DiGress.
+Both comparison scripts (`compare4_composite.py` and `compare4_guacamol_composite.py`) accept the following parameters:
 
-The results include:
-- Validity, uniqueness, and novelty metrics
-- Jensen-Shannon distances for property distributions
-- Visualization of molecular property distributions
+- `-ori`: Include original training dataset molecules in comparison
+- `-gen`: Include your generated molecules in comparison  
+- `-jtvae`: Include JTVAE generated molecules in comparison
+- `-digress`: Include DiGress generated molecules in comparison
+- `--reference` or `-ref`: Specify the reference category for comparisons (typically `ori`)
+- `--directory` or `-dir`: Directory name(s) containing generated molecules (from `--output_dir_suffix`)
+- `--load_descriptors`: Load pre-calculated descriptors instead of recalculating them (speeds up repeated analysis)
+
+### Property Distribution Analysis
+
+```bash
+# Basic comparison: your model vs original dataset
+python compare_guacamol/compare4_composite.py \
+       -gen -ori \
+       --reference ori \
+       --directory your_experiment_name
+
+# Full comparison: your model vs all baselines
+python compare_guacamol/compare4_composite.py \
+       -gen -ori -jtvae -digress \
+       --reference ori \
+       --directory your_experiment_name
+
+# Multiple experiment comparison
+python compare_guacamol/compare4_composite.py \
+       -gen -ori \
+       --reference ori \
+       --directory experiment1 experiment2 experiment3
+```
+
+This script compares distributions of molecular properties between generated and real molecules, producing:
+- Statistical comparison tables
+- Jensen-Shannon distance calculations
+- Property distribution plots
+- Composite visualization figures
+
+### Benchmark Evaluation (Guacamol)
+
+```bash
+# Basic Guacamol benchmark evaluation
+python compare_guacamol/compare4_guacamol_composite.py \
+       -gen -ori -jtvae -digress \
+       --reference ori \
+       --directory your_experiment_name
+
+# Load pre-calculated descriptors for faster evaluation
+python compare_guacamol/compare4_guacamol_composite.py \
+       -gen -ori -jtvae -digress \
+       --reference ori \
+       --directory your_experiment_name \
+       --load_descriptors
+```
+
+This script evaluates generated molecules against the Guacamol benchmark, producing:
+- Validity, uniqueness, and novelty metrics  
+- Internal similarity calculations
+- Benchmark comparison with JTVAE and DiGress
+- Performance ratio analysis
+
+### Output Files
+
+The evaluation scripts generate several output files in `mols_gen/{your_directory}/`:
+- `combined_molecules_with_descriptors.csv`: All molecules with calculated descriptors
+- `mytable_res_{category1}_vs_{category2}.csv`: Statistical comparison tables
+- `DistBetweenDists.csv`: Jensen-Shannon distances between distributions
+- `graficas_*/`: Directory containing visualization plots and figures
 
 ## Citation
 
