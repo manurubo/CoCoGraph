@@ -62,3 +62,6 @@ Data/CID-SMILES-filtered-lt70.txt
 *ant.py
 
 scripts
+*mytable*
+*batch*
+mols_gen/251104*

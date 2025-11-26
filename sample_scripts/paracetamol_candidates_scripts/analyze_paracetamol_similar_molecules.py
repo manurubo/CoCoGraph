@@ -1,8 +1,9 @@
 """
-Analyze Novel Molecules Dataset
+Analyze Paracetamol Similar Molecules
 
-This script calculates molecular descriptors for all molecules in the novel_molecules.csv dataset.
-It uses parallel processing to efficiently handle millions of molecules.
+This script searches a database of molecules and finds those most similar to paracetamol
+based on molecular descriptors. It calculates descriptors for all molecules and ranks
+them by similarity to paracetamol.
 
 Features:
 - Calculates 9 drug-like descriptors: MolWt, LogP, TPSA, QED, SA Score, etc.
@@ -10,20 +11,21 @@ Features:
 - Progress tracking with estimated time remaining
 - Saves results to novel_molecules_descriptors.csv
 - Creates distribution visualizations for all descriptors
+- Finds and visualizes top N most similar molecules to paracetamol
 
 Usage:
-    python sample_scripts/analyze_novel_molecules.py
+    python sample_scripts/paracetamol_candidates_scripts/analyze_paracetamol_similar_molecules.py
     
     # With custom number of workers
-    python sample_scripts/analyze_novel_molecules.py --n_workers 8
+    python sample_scripts/paracetamol_candidates_scripts/analyze_paracetamol_similar_molecules.py --n_workers 8
     
     # Process only first N molecules (for testing)
-    python sample_scripts/analyze_novel_molecules.py --limit 10000
+    python sample_scripts/paracetamol_candidates_scripts/analyze_paracetamol_similar_molecules.py --limit 10000
 """
 
 import os
 import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 import pandas as pd
 import numpy as np
@@ -44,7 +46,7 @@ plt.rcParams['font.family'] = 'Nimbus Sans'
 # Paracetamol SMILES (reference molecule for comparison)
 PARACETAMOL_SMILES = 'CC(=O)Nc1ccc(O)cc1'
 
-# Define the molecular descriptors (same as visualize_inpainted_molecules.py)
+# Define the molecular descriptors (same as visualize_paracetamol_inpainted.py)
 DESCRIPTORS = [
     'MolWt',
     'MolLogP',
@@ -70,7 +72,7 @@ DESCRIPTOR_NAMES = {
     'BertzCT': 'Molecular Complexity'
 }
 
-# Short names for radar chart (same as visualize_inpainted_molecules.py)
+# Short names for radar chart (same as visualize_paracetamol_inpainted.py)
 DESCRIPTOR_NAMES_SHORT = {
     'MolWt': 'Mol Weight',
     'MolLogP': 'LogP',
@@ -83,7 +85,7 @@ DESCRIPTOR_NAMES_SHORT = {
     'BertzCT': 'Complexity'
 }
 
-# Fixed ranges for each descriptor (same as visualize_inpainted_molecules.py)
+# Fixed ranges for each descriptor (same as visualize_paracetamol_inpainted.py)
 DESCRIPTOR_RANGES = {
     'MolWt': (0, 600),              # Molecular weight: 0-600 Da
     'MolLogP': (-5, 10),            # LogP: -5 to 10
@@ -161,7 +163,7 @@ def normalize_descriptors(paracetamol_values, molecule_values):
     """
     Normalize descriptor values to 0-1 range using fixed scales for each descriptor.
     This allows comparison across different molecules on a consistent scale.
-    (Same as visualize_inpainted_molecules.py)
+    (Same as visualize_paracetamol_inpainted.py)
     
     Args:
         paracetamol_values (dict): Paracetamol descriptors
@@ -199,7 +201,7 @@ def calculate_descriptor_distance(paracetamol_values, molecule_values):
     """
     Calculate Euclidean distance between normalized descriptor vectors.
     Lower distance = more similar molecules.
-    (Same as visualize_inpainted_molecules.py)
+    (Same as visualize_paracetamol_inpainted.py)
     
     Args:
         paracetamol_values (dict): Paracetamol descriptors
@@ -221,7 +223,7 @@ def calculate_descriptor_distance(paracetamol_values, molecule_values):
 
 def create_grouped_radar_visualization(df_top, paracetamol_descriptors, output_dir, show_original=True):
     """
-    Create a grouped visualization similar to visualize_inpainted_molecules.py
+    Create a grouped visualization similar to visualize_paracetamol_inpainted.py
     Shows paracetamol and top N most similar molecules.
     
     Args:
@@ -235,7 +237,7 @@ def create_grouped_radar_visualization(df_top, paracetamol_descriptors, output_d
     num_to_show = min(len(df_top), 10)
     df_repr = df_top.head(num_to_show).copy()
     
-    # Create figure with custom GridSpec layout (same as visualize_inpainted_molecules.py)
+    # Create figure with custom GridSpec layout (same as visualize_paracetamol_inpainted.py)
     fig = plt.figure(figsize=(20, 18))
     
     # GridSpec: 6 rows, 7 columns
@@ -246,10 +248,10 @@ def create_grouped_radar_visualization(df_top, paracetamol_descriptors, output_d
                           left=0.02, right=0.98, top=0.98, bottom=0.02,
                           width_ratios=[1, 1, 1, 0.01, 1.0, 1.0, 1.0])
     
-    # Colors for molecules (use tab10 colormap like visualize_inpainted_molecules.py)
+    # Colors for molecules (use tab10 colormap like visualize_paracetamol_inpainted.py)
     colors = plt.colormaps.get_cmap('tab10')(np.linspace(0, 1, num_to_show))
     
-    # Paracetamol molecule (top center of left side) - same as visualize_inpainted_molecules.py
+    # Paracetamol molecule (top center of left side) - same as visualize_paracetamol_inpainted.py
     if show_original:
         ax_orig = fig.add_subplot(gs[0, 1])
         paracetamol_mol = Chem.MolFromSmiles(PARACETAMOL_SMILES)
@@ -266,7 +268,7 @@ def create_grouped_radar_visualization(df_top, paracetamol_descriptors, output_d
                     ha='center', va='top', transform=ax_orig.transAxes, color='red',
                     bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8, edgecolor='red', linewidth=2))
         
-        # Add red star indicator (like original molecule in visualize_inpainted_molecules.py)
+        # Add red star indicator (like original molecule in visualize_paracetamol_inpainted.py)
         ax_orig.text(0.98, 0.98, '★', fontsize=16, fontweight='bold',
                     ha='right', va='top', transform=ax_orig.transAxes,
                     bbox=dict(boxstyle='square,pad=0.4', facecolor='red', 
@@ -349,11 +351,11 @@ def create_grouped_radar_visualization(df_top, paracetamol_descriptors, output_d
         paracetamol_values_display.append(0.5)
     paracetamol_values_display += paracetamol_values_display[:1]
     
-    # Plot paracetamol with red stars (like original molecule in visualize_inpainted_molecules.py)
+    # Plot paracetamol with red stars (like original molecule in visualize_paracetamol_inpainted.py)
     ax_radar.plot(angles, paracetamol_values_display, '*-', linewidth=3,
                   color='red', markersize=15, markeredgewidth=2, markeredgecolor='darkred')
     
-    # Plot each of the top N molecules (like candidates in visualize_inpainted_molecules.py)
+    # Plot each of the top N molecules (like candidates in visualize_paracetamol_inpainted.py)
     for i, (idx, row) in enumerate(df_repr.iterrows()):
         if i >= num_to_show:
             break
@@ -380,7 +382,7 @@ def create_grouped_radar_visualization(df_top, paracetamol_descriptors, output_d
     ax_radar.set_xticks(angles[:-1])
     ax_radar.set_xticklabels([])
     
-    # Manually place labels with rotation (same as visualize_inpainted_molecules.py)
+    # Manually place labels with rotation (same as visualize_paracetamol_inpainted.py)
     labels = [DESCRIPTOR_NAMES_SHORT[desc] for desc in DESCRIPTORS]
     for i, (label_text, angle) in enumerate(zip(labels, angles[:-1])):
         rotation = np.degrees(angle)
@@ -407,7 +409,7 @@ def create_grouped_radar_visualization(df_top, paracetamol_descriptors, output_d
     
     # No legend needed - colored boxes on molecules show the mapping
     
-    # Add title similar to visualize_inpainted_molecules.py
+    # Add title similar to visualize_paracetamol_inpainted.py
     ax_radar.set_title('Descriptor Comparison (Δ from Original, ±25%)', 
                       size=26, pad=25, fontweight='bold')
     
@@ -713,7 +715,7 @@ def main():
     paracetamol_descriptors = calculate_descriptors_single(PARACETAMOL_SMILES)
     print(f"Paracetamol MW: {paracetamol_descriptors['MolWt']:.2f}, QED: {paracetamol_descriptors['QED']:.3f}")
     
-    # Calculate distance to paracetamol for each molecule (like visualize_inpainted_molecules.py)
+    # Calculate distance to paracetamol for each molecule (like visualize_paracetamol_inpainted.py)
     print("\nCalculating similarity to paracetamol...")
     distances = []
     for idx, row in df.iterrows():

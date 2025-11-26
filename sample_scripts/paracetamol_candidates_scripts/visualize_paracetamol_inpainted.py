@@ -1,9 +1,10 @@
 """
-Visualize and Rank Inpainted Molecules
+Visualize and Rank Paracetamol Inpainted Molecules
 
-This script analyzes inpainted molecules and ranks them by descriptor distance to the original.
-It creates a grouped visualization showing the top 10 candidates with:
-1. Grid of molecule structures (original + top 10 candidates)
+This script analyzes inpainted paracetamol molecules (with fragments added) and ranks them
+by descriptor distance to the original paracetamol. It creates a grouped visualization
+showing the top 10 candidates with:
+1. Grid of molecule structures (original paracetamol + top 10 candidates)
 2. Single radar chart comparing all candidates (original shown with stars)
 3. Each candidate in a unique color for easy identification
 
@@ -11,31 +12,31 @@ Features:
 - Removes duplicate molecules (using canonical SMILES)
 - Calculates 9 drug-like descriptors: MolWt, LogP, TPSA, QED, SA Score, etc.
 - Computes Euclidean distance in normalized descriptor space
-- Ranks all candidates by descriptor distance to original
+- Ranks all candidates by descriptor distance to original paracetamol
 - Creates grouped comparison visualization (top 10 on one radar chart)
 - Exports ranked CSV files for further analysis
 - Optional: individual visualizations with --create_summary flag
 
 Usage:
     # Main usage (creates grouped visualization)
-    python sample_scripts/visualize_inpainted_molecules.py \
+    python sample_scripts/paracetamol_candidates_scripts/visualize_paracetamol_inpainted.py \
         --input_dir Inpaint_Test \
         --top_n 10
     
     # With individual visualizations
-    python sample_scripts/visualize_inpainted_molecules.py \
+    python sample_scripts/paracetamol_candidates_scripts/visualize_paracetamol_inpainted.py \
         --input_dir Inpaint_Test \
         --top_n 20 \
         --create_summary
     
     # Hide original molecule from grouped visualization
-    python sample_scripts/visualize_inpainted_molecules.py \
+    python sample_scripts/paracetamol_candidates_scripts/visualize_paracetamol_inpainted.py \
         --input_dir Inpaint_Test \
         --top_n 10 \
         --hide_original
     
     # Show colored borders for debugging layout
-    python sample_scripts/visualize_inpainted_molecules.py \
+    python sample_scripts/paracetamol_candidates_scripts/visualize_paracetamol_inpainted.py \
         --input_dir Inpaint_Test \
         --top_n 10 \
         --borders
@@ -44,7 +45,7 @@ Usage:
 import os
 import sys
 # Add the parent directory to the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 import pandas as pd
 import numpy as np

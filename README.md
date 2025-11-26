@@ -133,10 +133,12 @@ The repository is organized as follows:
   - `config.py`: Configuration parameters and settings
   - `data_loader.py`: Utilities for loading and processing data
   - `data_preparation_utils.py`: Utilities for data preparation
+  - `formula_utils.py`: Utilities for building molecular graphs from formulas
   - `libraries.py`: Import statements for external libraries
   - `losses.py`: Loss functions for model training
   - `models.py`: Neural network model definitions
   - `sample_utils.py`: Utilities for molecule sampling
+  - `valence_utils.py`: Utilities for valence, charge, and radical distributions
 
 - **main_scripts/**: Contains the main code to launch and train the algorithms
   - `main_sender_*.py`: Sender scripts to initiate training
@@ -144,12 +146,27 @@ The repository is organized as follows:
   - `main_time_pred*.py`: Scripts for training the time prediction model
 
 - **sample_scripts/**: Contains scripts for generating molecules once models are trained
-  - `sample_molecules_BASEmodel.py`: Script for molecule generation using BASE models (without fingerprints)
-  - `sample_molecules_FPSmodel.py`: Script for molecule generation using FPS models (with fingerprints)
+  - **Data Preparation Scripts**:
+    - `build_valid_valence_table.py`: Builds valence distribution table from dataset
+    - `build_charge_distribution.py`: Builds charge distribution weights from dataset
+    - `build_radical_table.py`: Builds radical distribution weights from dataset
+    - `extract_fragment_library.py`: Extracts molecular fragment library for inpainting
+  - **Sampling Scripts**:
+    - `sample_molecules_BASEmodel.py`: Script for molecule generation using BASE models (without fingerprints)
+    - `sample_molecules_FPSmodel.py`: Script for molecule generation using FPS models (with fingerprints)
+    - `sample_molecules_FPSmodel_inpaint.py`: Molecular inpainting (attach fragments to molecules)
+    - `sample_molecules_FPSmodel_unseed.py`: Unseeded generation variant
+    - `sample_molecules_FPSmodel_withouttimemodel.py`: Ablation study without time model
+  - **Analysis/Utility Scripts**:
+    - `prop_evolution.py`: Simulates noise trajectories for analysis
+    - **paracetamol_candidates_scripts/**: Scripts for analyzing paracetamol candidates
+      - `analyze_paracetamol_similar_molecules.py`: Finds molecules similar to paracetamol from database
+      - `visualize_paracetamol_inpainted.py`: Visualizes and ranks inpainted paracetamol candidates
 
 - **compare_guacamol/**: Used to compare results and generate graphs for the paper
   - `compare4_composite.py`: Property distribution analysis and visualization script  
   - `compare4_guacamol_composite.py`: Guacamol benchmark evaluation script
+  - `Guacamol_Benchmarking_indepence_and_randomedgeswap.ipynb`: Notebook for analyzing noise trajectory independence and random edge swap effects
   - Benchmarking scripts against other models (JTVAE, DiGress)
 
 - **models/**: Contains trained model weights
@@ -162,8 +179,9 @@ The repository is organized as follows:
   - Evaluation metrics
 
 - **mols_gen/**: Directory that contains generated molecules
-  - Molecules in SMILES format
-  - Analysis results
+  - Molecules in SMILES format (CSV files with SMILES, formulas, descriptors)
+  - Analysis results (visualizations, ranked candidates, descriptor comparisons)
+  - Organized by experiment name (from `--output_dir_suffix`)
 
 ## Training Models
 
@@ -289,6 +307,197 @@ Key sampling parameters configurable via command-line arguments:
 
 Make sure to replace `model_epoch_X.pth` and `model_epoch_Y.pth` with the actual paths to your trained model checkpoints.
 
+## Data Preparation Scripts
+
+Before generating molecules, you may need to prepare data files that guide the generation process. These scripts extract chemical constraints and fragment libraries from your dataset.
+
+### Building Chemical Constraint Tables
+
+These scripts analyze your dataset and create JSON files that guide molecular graph construction:
+
+1. **Build Valid Valence Table**:
+   ```bash
+   python sample_scripts/build_valid_valence_table.py \
+          --input Data/molecules_lt70atoms_annotated.csv \
+          --output Data/valid_valences.json
+   ```
+   Creates `Data/valid_valences.json` with valence distributions for each element-charge combination.
+
+2. **Build Charge Distribution**:
+   ```bash
+   python sample_scripts/build_charge_distribution.py \
+          --input Data/molecules_lt70atoms_annotated.csv \
+          --output Data/charge_symbol_weights.json
+   ```
+   Creates `Data/charge_symbol_weights.json` with charge probability distributions.
+
+3. **Build Radical Table**:
+   ```bash
+   python sample_scripts/build_radical_table.py \
+          --input Data/molecules_lt70atoms_annotated.csv \
+          --output Data/radical_symbol_weights.json
+   ```
+   Creates `Data/radical_symbol_weights.json` with radical probability distributions.
+
+These files are automatically loaded by sampling scripts (`sample_molecules_FPSmodel_unseed.py`, `sample_molecules_FPSmodel_inpaint.py`) if they exist in the `Data/` directory.
+
+### Extracting Fragment Library
+
+For inpainting operations, extract a library of molecular fragments:
+
+```bash
+python sample_scripts/extract_fragment_library.py \
+       --input_csv Data/molecules_lt70atoms_annotated.csv \
+       --output_file Data/fragment_library.txt \
+       --min_atoms 2 \
+       --max_atoms 8 \
+       --min_frequency 5 \
+       --max_fragments 1000
+```
+
+This creates `Data/fragment_library.txt` with common molecular fragments that can be attached to molecules during inpainting.
+
+## Unseeded Generation
+
+The unseeded generation mode creates random molecular graphs from formulas without using SMILES as seeds. This requires the chemical constraint tables built above.
+
+### Usage
+
+```bash
+python sample_scripts/sample_molecules_FPSmodel_unseed.py \
+       --input_smiles_csv Data/molecules_lt70atoms_annotated.csv \
+       --output_dir_suffix unseeded_run \
+       --model_checkpoint_path models/FPS_diffusion/model_epoch_1_slice_22.pth \
+       --time_model_checkpoint_path models/FPS_time/model_epoch_2_slice_22.pth \
+       --batch_size_sample 1000 \
+       --batch_size_process 10 \
+       --save_every_n_batches 10 \
+       --num_workers 8
+```
+
+**How it works:**
+1. Samples SMILES from the input CSV
+2. Extracts molecular formulas from the SMILES
+3. Builds random molecular graphs directly from formulas (using valence/charge/radical distributions)
+4. Applies noise and denoises using the diffusion model
+5. Uses the time model to select the best denoised molecule
+
+**Prerequisites:** Run the data preparation scripts (`build_valid_valence_table.py`, `build_charge_distribution.py`, `build_radical_table.py`) first to generate the constraint files.
+
+## Ablation Study: Generation Without Time Model
+
+To study the contribution of the time model, you can generate molecules using only the diffusion model:
+
+```bash
+python sample_scripts/sample_molecules_FPSmodel_withouttimemodel.py \
+       --input_smiles_csv Data/molecules_lt70atoms_annotated.csv \
+       --output_dir_suffix ablation_no_time_model \
+       --model_checkpoint_path models/FPS_diffusion/model_epoch_1_slice_22.pth \
+       --batch_size_sample 1000 \
+       --batch_size_process 50 \
+       --save_every_n_batches 10 \
+       --num_workers 8
+```
+
+**Note:** This script uses theoretical noise levels instead of time model predictions, allowing comparison of generation quality with and without the collaborative time model.
+
+## Noise Trajectory Simulation
+
+The `prop_evolution.py` script simulates noise trajectories on molecules to study how molecules evolve under different noise levels. This is useful for analyzing diffusion model behavior and preparing data for benchmarking.
+
+### Usage
+
+```bash
+python sample_scripts/prop_evolution.py \
+       --input_csv Data/molecules_lt70atoms_annotated.csv \
+       --num_molecules 1000 \
+       --sigma_max 0.5 \
+       --start_index 0 \
+       --seed 1111
+```
+
+**Output:**
+- `sample_scripts/output_YYYYmmdd_HHMMSS/noised_smiles.csv`: Mapping of original SMILES to noised SMILES at each noise step
+- `sample_scripts/output_YYYYmmdd_HHMMSS/swaps_summary.csv`: Summary of swaps applied per molecule
+- `sample_scripts/output_YYYYmmdd_HHMMSS/summary.json`: Metadata about the run
+
+**Use case:** The generated noised SMILES can be used in `compare_guacamol/Guacamol_Benchmarking_indepence_and_randomedgeswap.ipynb` to analyze how noise affects molecular properties and benchmark performance.
+
+## Paracetamol Candidates Workflow
+
+This workflow demonstrates how to find and analyze candidate molecules similar to a target molecule (paracetamol) using inpainting and database search.
+
+### Step 1: Extract Fragment Library
+
+First, extract a library of fragments for inpainting:
+
+```bash
+python sample_scripts/extract_fragment_library.py \
+       --input_csv Data/molecules_lt70atoms_annotated.csv \
+       --output_file Data/fragment_library.txt \
+       --min_atoms 2 \
+       --max_atoms 8 \
+       --max_fragments 1000
+```
+
+### Step 2: Generate Inpainted Molecules
+
+Generate inpainted paracetamol candidates by attaching fragments:
+
+```bash
+python sample_scripts/sample_molecules_FPSmodel_inpaint.py \
+       --target_smiles "CC(=O)Nc1ccc(O)cc1" \
+       --fragment_library Data/fragment_library.txt \
+       --output_dir_suffix Inpaint_Paracetamol \
+       --batch_size_process 10 \
+       --batch_size_sample 100 \
+       --model_checkpoint_path models/FPS_diffusion/model_epoch_1_slice_22.pth \
+       --time_model_checkpoint_path models/FPS_time/model_epoch_2_slice_22.pth
+```
+
+**Output:** Generated molecules saved to `mols_gen/Inpaint_Paracetamol/all_generated_molecules.csv` with columns:
+- `smiles`: Generated molecule SMILES
+- `original_smiles`: Original paracetamol SMILES
+- `fragment_formula`: Formula of the attached fragment
+
+### Step 3: Visualize and Rank Inpainted Candidates
+
+Analyze and visualize the top candidates:
+
+```bash
+python sample_scripts/paracetamol_candidates_scripts/visualize_paracetamol_inpainted.py \
+       --input_dir Inpaint_Paracetamol \
+       --top_n 10 \
+       --create_summary
+```
+
+**Output:** Saved to `mols_gen/Inpaint_Paracetamol/visualizations/`:
+- `top10_grouped_comparison.png`: Main visualization (paracetamol + top 10 candidates)
+- `top_candidates.csv`: Ranked candidates with descriptor comparisons
+- `all_ranked_molecules.csv`: All molecules ranked by similarity
+- `rank_*.png`: Individual visualizations (if `--create_summary` is used)
+
+### Step 4: Search Database for Similar Molecules
+
+Alternatively, search a large database for molecules similar to paracetamol:
+
+```bash
+python sample_scripts/paracetamol_candidates_scripts/analyze_paracetamol_similar_molecules.py \
+       --input_file Data/generated_database/novel_molecules.csv \
+       --output_file Data/generated_database/novel_molecules_descriptors.csv \
+       --output_dir Data/generated_database/visualizations \
+       --top_n 10 \
+       --limit 100000
+```
+
+**Output:** Saved to `Data/generated_database/`:
+- `novel_molecules_descriptors.csv`: All molecules with descriptors and distances to paracetamol
+- `visualizations/grouped_radar_distribution.png`: Paracetamol + top 10 similar molecules
+- `visualizations/descriptor_distributions.png`: Distribution plots for all descriptors
+- `visualizations/descriptor_statistics.csv`: Summary statistics
+
+**Note:** Use `--load_descriptors` to skip recalculation if descriptors were already computed.
+
 ## Obtaining Results
 
 To evaluate generated molecules and reproduce the paper's results:
@@ -355,6 +564,16 @@ This script evaluates generated molecules against the Guacamol benchmark, produc
 - Internal similarity calculations
 - Benchmark comparison with JTVAE and DiGress
 - Performance ratio analysis
+
+### Noise Trajectory Analysis
+
+The notebook `compare_guacamol/Guacamol_Benchmarking_indepence_and_randomedgeswap.ipynb` analyzes how noise trajectories affect molecular properties and benchmark performance. It compares:
+- Original molecules vs. noised molecules at different noise levels
+- Tanimoto similarity between clean and noised SMILES
+- Distribution learning benchmarks on noised molecules
+- Independence of noise effects across different datasets
+
+**Prerequisites:** Run `prop_evolution.py` first to generate noised SMILES data.
 
 ### Output Files
 
