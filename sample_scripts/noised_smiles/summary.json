@@ -1,0 +1,9 @@
+{
+  "num_molecules": 20000,
+  "num_records": 571917,
+  "swaps_csv": "/export/home/shared/Projects/Manu22-23/MoleculeDifusion/CoCoGraph/sample_scripts/output_20251022_112855/swaps_summary.csv",
+  "noised_csv": "/export/home/shared/Projects/Manu22-23/MoleculeDifusion/CoCoGraph/sample_scripts/output_20251022_112855/noised_smiles.csv",
+  "sigma_max": 0.5,
+  "input_csv": "Data/molecules_lt70atoms_annotated.csv",
+  "smiles_column": "smiles"
+}

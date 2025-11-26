@@ -45,9 +45,15 @@ nohup*
 combined*
 run*
 explore*
+
+# additions to clean
 compare_guacamol/compare4_composite.py
 compare_guacamol/compare4_guacamol_composite.py
 compare_guacamol/Guacamol_Benchmarking.ipynb
 Data/generated_database/visualizations/individual_descriptors/
 Data/generated_database/visualizations/descriptor_statistics.csv
 Data/generated_database/visualizations/descriptor_distributions.png
+Data/generated_database/novel_molecules_descriptors.csv
+Data/mols_gen/
+Data/CID-SMILES-filtered-lt70_canonical.txt
+Data/CID-SMILES-filtered-lt70.txt
