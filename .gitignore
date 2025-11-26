@@ -57,3 +57,8 @@ Data/generated_database/novel_molecules_descriptors.csv
 Data/mols_gen/
 Data/CID-SMILES-filtered-lt70_canonical.txt
 Data/CID-SMILES-filtered-lt70.txt
+
+*old.py
+*ant.py
+
+scripts
