@@ -45,3 +45,6 @@ nohup*
 combined*
 run*
 explore*
+compare_guacamol/compare4_composite.py
+compare_guacamol/compare4_guacamol_composite.py
+compare_guacamol/Guacamol_Benchmarking.ipynb

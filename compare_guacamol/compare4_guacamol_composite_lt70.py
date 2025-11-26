@@ -1,11 +1,3 @@
-import subprocess
-import os
-import sys
-import argparse
-
-# Add the parent directory to the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
 import pandas as pd
 from tableone import TableOne
 import seaborn as sns
@@ -21,6 +13,7 @@ from rdkit.Chem import AllChem, Descriptors, QED, rdMolDescriptors
 import numpy as np
 from scipy.stats import entropy
 from scipy.stats import gaussian_kde
+from multiprocessing import Pool, cpu_count
 
 
 import logging
@@ -80,10 +73,83 @@ def get_mols(smiles_list):
 # Function to compute descriptors for a list of SMILES
 from tqdm import tqdm
 
-def compute_all_descriptors(smiles_list):
-    mols = get_mols(smiles_list)
-    descriptors = [calculate_descriptors(mol) if mol is not None else {desc: np.nan for desc in DESCRIPTORS} for mol in tqdm(mols, desc="Computing descriptors")]
+def _compute_descriptor_worker(smiles):
+    """Worker function for parallel descriptor computation"""
+    mol = Chem.MolFromSmiles(smiles) if smiles != "None" else None
+    if mol is not None:
+        return calculate_descriptors(mol)
+    else:
+        return {desc: np.nan for desc in DESCRIPTORS}
+
+def compute_all_descriptors(smiles_list, n_jobs=None):
+    """
+    Compute descriptors for a list of SMILES using multiprocessing
+    
+    Args:
+        smiles_list: List of SMILES strings
+        n_jobs: Number of parallel jobs. If None, uses all available CPUs
+    
+    Returns:
+        DataFrame with computed descriptors
+    """
+    if n_jobs is None:
+        n_jobs = cpu_count() - 4
+    
+    # Use multiprocessing to parallelize descriptor calculation
+    with Pool(processes=n_jobs) as pool:
+        descriptors = list(tqdm(
+            pool.imap(_compute_descriptor_worker, smiles_list),
+            total=len(smiles_list),
+            desc=f"Computing descriptors (using {n_jobs} cores)"
+        ))
+    
     return pd.DataFrame(descriptors)
+
+# Helper to append RDKit descriptors to a dataframe with a 'smiles' column
+def add_descriptors(df_subset, smiles_column='smiles', n_jobs=None):
+    """
+    Add RDKit descriptors to a dataframe
+    
+    Args:
+        df_subset: DataFrame with SMILES column
+        smiles_column: Name of the SMILES column
+        n_jobs: Number of parallel jobs for descriptor computation
+    
+    Returns:
+        DataFrame with added descriptors
+    """
+    descriptors_df = compute_all_descriptors(df_subset[smiles_column].tolist(), n_jobs=n_jobs)
+    df_subset = pd.concat([df_subset, descriptors_df], axis=1)
+    return df_subset
+
+# Helper: filter SMILES by <70 atoms including implicit hydrogens
+def filter_smiles_lt70(smiles_list):
+    filtered_smiles = []
+    atom_counts = []
+    for smiles in tqdm(smiles_list, desc="Filtering <70 atoms"):
+        if smiles == "None":
+            filtered_smiles.append("None")
+            continue
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is not None:
+            mol_with_h = Chem.AddHs(mol)
+            num_atoms = mol_with_h.GetNumAtoms()
+            atom_counts.append(num_atoms)
+            if num_atoms < 70:
+                filtered_smiles.append(smiles)
+            else:
+                # Keep alignment by marking filtered-out entries
+                filtered_smiles.append("None")
+        else:
+            filtered_smiles.append("None")
+    return filtered_smiles
+
+def filter_df_smiles_lt70(df, smiles_col='smiles'):
+    df = df.copy()
+    df[smiles_col] = filter_smiles_lt70(df[smiles_col].tolist())
+    # Drop invalid/filtered-out rows marked as "None" to avoid downstream RDKit issues
+    df = df[df[smiles_col] != "None"].reset_index(drop=True)
+    return df
 
 # Function to get fingerprints (if still needed)
 def get_fingerprints(mols, radius=2, length=4096):
@@ -131,22 +197,38 @@ def calculate_internal_pairwise_similarities(smiles_list):
 
 # Argument parsing (unchanged)
 parser = argparse.ArgumentParser(description='Compare molecule categories.')
-parser.add_argument('-ori', action='store_true', help='Include ori in comparison')
-parser.add_argument('-gen', action='store_true', help='Include gen in comparison')
+parser.add_argument('-ori', choices=['nosotros', 'guacamol', 'pubchem'], help='Include ori and select source: nosotros|guacamol|pubchem')
+parser.add_argument('-gen', nargs='?', const=True, help='Include gen in comparison; add "corr" to use corrected file')
 parser.add_argument('-cero', action='store_true', help='Include cero in comparison')
 parser.add_argument('-jtvae', action='store_true', help='Include jtvae in comparison')
 parser.add_argument('-digress', action='store_true', help='Include digress in comparison')
+parser.add_argument('-defog_strict', action='store_true', help='Include DeFOG strict in comparison')
+parser.add_argument('-defog_relaxed', action='store_true', help='Include DeFOG relaxed in comparison')
 parser.add_argument('-real', action='store_true', help='Include real in comparison')
 parser.add_argument('-ref', '--reference', type=str, help='The reference category for comparison')
 parser.add_argument('-dir', '--directory', nargs='+', help='Directory or list of directories to compare')
 parser.add_argument('-load', '--load_descriptors', action='store_true', help='Load pre-calculated descriptors instead of recalculating them')
+parser.add_argument('-n_jobs', '--n_jobs', type=int, default=None, help='Number of CPU cores to use for parallel processing (default: all available cores)')
 args = parser.parse_args()
+
+# Set up number of jobs for parallel processing
+n_cores = args.n_jobs if args.n_jobs is not None else cpu_count() - 4
+logger.info(f"Using {n_cores} CPU cores for parallel descriptor computation")
 
 # Check if at least one directory is provided
 if not args.directory:
     raise ValueError("You must provide at least one directory for comparison.")
 
 directories = args.directory
+
+# Detect if '-gen corr' was passed and set generated file name accordingly
+use_corr = isinstance(args.gen, str) and args.gen.lower() == 'corr'
+generated_filename = 'all_generated_molecules_corr.csv' if use_corr else 'all_generated_molecules.csv'
+graph_dir_name = 'graficas_guacamol_random_10K_composite_corr' if use_corr else 'graficas_guacamol_random_10K_composite'
+
+# Add suffix for pubchem if that option is selected
+if args.ori == 'pubchem':
+    graph_dir_name += '_pubchem'
 
 # Adjust the comparisons list based on the command line arguments
 selected_categories = []
@@ -158,6 +240,10 @@ if args.jtvae:
     selected_categories.append('jtvae')
 if args.digress:
     selected_categories.append('digress')
+if args.defog_strict:
+    selected_categories.append('defog_strict')
+if args.defog_relaxed:
+    selected_categories.append('defog_relaxed')
 if args.real:
     selected_categories.append('real')
 
@@ -186,34 +272,91 @@ str_date = directories[0]
 
 if args.load_descriptors:
     # Load pre-calculated descriptors
-    df_combined = pd.read_csv(f'mols_gen/{str_date}/combined_molecules_with_descriptors_100K.csv') # tambien version 100K
+    df_combined = pd.read_csv(f'../mols_gen/{str_date}/combined_molecules_with_descriptors_100K.csv') # tambien version 100K
+    # Apply <70 atoms filter across all categories
+    df_combined['smiles'] = filter_smiles_lt70(df_combined['smiles'].tolist())
+    df_combined = df_combined[df_combined['smiles'] != "None"].reset_index(drop=True)
     
 else:
     # Read CSV files
-    df = pd.read_csv(f'mols_gen/{str_date}/all_generated_molecules.csv')
-    df_jtvae = pd.read_csv(f'Data/jtvae_generated_filtered.csv')  # Updated path
-    df_digress = pd.read_csv(f'Data/digress_generated_filtered.csv')  # Updated path
+    df = pd.read_csv(f'../mols_gen/{str_date}/{generated_filename}')
+    df_jtvae = pd.read_csv(f'../Data/jtvae_generated_filtered.csv')  # Updated path
+    df_digress = pd.read_csv(f'../Data/digress_generated_filtered.csv')  # Updated path
+    # DeFOG sources
+    defog_strict_path = '../Data/defog_final_smiles_strict.txt'
+    defog_relaxed_path = '../Data/defog_final_smiles_relaxed.txt'
 
-    df_molecules = pd.read_csv('Data/molecules_lt70atoms_annotated.csv')  # Updated path
-    df_molecules = df_molecules.sample(frac=1, random_state=1111).reset_index(drop=True)
+    # Load original molecules based on -ori choice
+    smiles_pool = []
+    if args.ori == 'nosotros':
+        print("Loading nosotros molecules...")
+        df_molecules = pd.read_csv('../Data/molecules_lt70atoms_annotated.csv')
+        smiles_pool = df_molecules['smiles'].dropna().tolist()
+    elif args.ori == 'guacamol':
+        smiles_path = '../Data/guacamol_v1_train_lt70.smiles'
+        print(f"Loading guacamol molecules from {smiles_path}...")
+        with open(smiles_path, 'r') as f:
+            smiles_pool = [line.strip() for line in tqdm(f, desc="Loading SMILES") if line.strip()]
+    elif args.ori == 'pubchem':
+        smiles_path = '../Data/CID-SMILES-filtered-lt70.txt'
+        print(f"Loading pubchem molecules from {smiles_path}...")
+        with open(smiles_path, 'r') as f:
+            smiles_pool = [line.strip() for line in tqdm(f, desc="Loading SMILES") if line.strip()]
+        
+    # Select up to 100000 random molecules from the chosen original dataset and filter by <70 atoms
+    if len(smiles_pool) > 0:
+        if args.ori == 'pubchem':
+            selected_smiles = pd.Series(smiles_pool).sample(n=min(1000000, len(smiles_pool)), random_state=1111).tolist()
+        else:
+            selected_smiles = pd.Series(smiles_pool).sample(n=min(100000, len(smiles_pool)), random_state=1111).tolist()
+    else:
+        selected_smiles = []
+    selected_smiles = filter_smiles_lt70(selected_smiles)
 
-    # Select 100000 random molecules from the original dataset
-    selected_smiles = df_molecules.sample(n=100000, random_state=1111)['smiles'].tolist()
-
-    # Select 15000 random molecules from the generated dataset
+    # Select 15000 random molecules from the generated dataset and filter by <70 atoms
     selected_smiles_gen = df.sample(n=15000, random_state=1111)['smiles'].tolist()
+    selected_smiles_gen = filter_smiles_lt70(selected_smiles_gen)
 
     # Separate the dataframe into original, generated, etc.
     df_ori = pd.DataFrame({'smiles_ori': selected_smiles})
     df_gen = pd.DataFrame({'smiles_gen': selected_smiles_gen})
     df_jtvae = df_jtvae[['smiles_jtvae']]
     df_digress = df_digress[['smiles_digress']]
+    # Load DeFOG frames if requested
+    if args.defog_strict and os.path.exists(defog_strict_path):
+        with open(defog_strict_path, 'r') as f:
+            smiles_defog_strict = [line.strip() for line in f if line.strip()]
+        smiles_defog_strict = filter_smiles_lt70(smiles_defog_strict)
+        df_defog_strict = pd.DataFrame({'smiles': smiles_defog_strict})
+        df_defog_strict = df_defog_strict[df_defog_strict['smiles'] != "None"].reset_index(drop=True)
+        df_defog_strict['category'] = 'defog_strict'
+    else:
+        df_defog_strict = None
+    if args.defog_relaxed and os.path.exists(defog_relaxed_path):
+        with open(defog_relaxed_path, 'r') as f:
+            smiles_defog_relaxed = [line.strip() for line in f if line.strip()]
+        smiles_defog_relaxed = filter_smiles_lt70(smiles_defog_relaxed)
+        df_defog_relaxed = pd.DataFrame({'smiles': smiles_defog_relaxed})
+        df_defog_relaxed = df_defog_relaxed[df_defog_relaxed['smiles'] != "None"].reset_index(drop=True)
+        df_defog_relaxed['category'] = 'defog_relaxed'
+    else:
+        df_defog_relaxed = None
 
     # Rename columns to have the same name across dataframes
     df_ori = df_ori.rename(columns={'smiles_ori': 'smiles'})
     df_gen = df_gen.rename(columns={'smiles_gen': 'smiles'})
     df_jtvae = df_jtvae.rename(columns={'smiles_jtvae': 'smiles'})
     df_digress = df_digress.rename(columns={'smiles_digress': 'smiles'})
+
+    # Apply <70 atoms filter to all dataframes and drop invalid
+    df_ori = filter_df_smiles_lt70(df_ori, 'smiles')
+    df_gen = filter_df_smiles_lt70(df_gen, 'smiles')
+    df_jtvae = filter_df_smiles_lt70(df_jtvae, 'smiles')
+    df_digress = filter_df_smiles_lt70(df_digress, 'smiles')
+    if df_defog_strict is not None:
+        df_defog_strict = add_descriptors(df_defog_strict, 'smiles', n_jobs=args.n_jobs)
+    if df_defog_relaxed is not None:
+        df_defog_relaxed = add_descriptors(df_defog_relaxed, 'smiles', n_jobs=args.n_jobs)
 
     # Add a column to indicate the category
     df_ori['category'] = 'ori'
@@ -233,41 +376,44 @@ else:
         df_gen = df_gen.drop(columns=['time_pred'])
 
     # Compute descriptors for each category DataFrame
-    def add_descriptors(df_subset, smiles_column):
-        
-        descriptors_df = compute_all_descriptors(df_subset['smiles'])
-        df_subset = pd.concat([df_subset, descriptors_df], axis=1)
-        return df_subset
-
-    df_ori = add_descriptors(df_ori, 'smiles')
-    df_gen = add_descriptors(df_gen, 'smiles')
-    df_jtvae = add_descriptors(df_jtvae, 'smiles')
-    df_digress = add_descriptors(df_digress, 'smiles')
+    df_ori = add_descriptors(df_ori, 'smiles', n_jobs=args.n_jobs)
+    df_gen = add_descriptors(df_gen, 'smiles', n_jobs=args.n_jobs)
+    df_jtvae = add_descriptors(df_jtvae, 'smiles', n_jobs=args.n_jobs)
+    df_digress = add_descriptors(df_digress, 'smiles', n_jobs=args.n_jobs)
 
     # Concatenate all DataFrames
-    df_combined = pd.concat([df_ori, df_gen, df_jtvae, df_digress], axis=0).reset_index(drop=True)
+    frames = [df_ori, df_gen, df_jtvae, df_digress]
+    if df_defog_strict is not None:
+        frames.append(df_defog_strict)
+    if df_defog_relaxed is not None:
+        frames.append(df_defog_relaxed)
+    df_combined = pd.concat(frames, axis=0).reset_index(drop=True)
 
     # Save the combined dataframe with descriptors for future use
-    df_combined.to_csv(f'mols_gen/{str_date}/combined_molecules_with_descriptors_100K.csv', index=False)
+    df_combined.to_csv(f'../mols_gen/{str_date}/combined_molecules_with_descriptors_100K.csv', index=False)
 
 
 # If there are additional directories, process them
 contador = 1
 if len(directories) > 1:
     while contador < len(directories):
-        df_new = pd.read_csv(f'mols_gen/{directories[contador]}/all_generated_molecules.csv')
+        df_new = pd.read_csv(f'../mols_gen/{directories[contador]}/{generated_filename}')
         df_gen_new = df_new[['smiles_gen']]
         df_gen_new = df_gen_new.rename(columns={'smiles_gen': 'smiles'})
         df_gen_new['category'] = 'gen_' + directories[contador]
-        df_gen_new = add_descriptors(df_gen_new, 'smiles')
+        # Apply <70 atoms filter before computing descriptors
+        df_gen_new = filter_df_smiles_lt70(df_gen_new, 'smiles')
+        df_gen_new = add_descriptors(df_gen_new, 'smiles', n_jobs=args.n_jobs)
         df_combined = pd.concat([df_combined, df_gen_new], axis=0).reset_index(drop=True)
         # Ensure output directory exists for additional directories
-        os.makedirs(f'mols_gen/{directories[contador]}/graficas_guacamol_random_10K_composite', exist_ok=True)
+        os.makedirs(f'../mols_gen/{directories[contador]}/{graph_dir_name}', exist_ok=True)
         contador += 1
 
 # Calculate internal similarity using the new descriptors or fingerprints if still needed
 df_combined['internal_similarity'] = None
 for categoria_similarity in selected_categories:
+    print(categoria_similarity)
+    print(df_combined['category'].unique())
     # Get all smiles for this category
     category_smiles = df_combined[df_combined['category'] == categoria_similarity]['smiles']
     category_indices = df_combined[df_combined['category'] == categoria_similarity].index
@@ -285,6 +431,7 @@ for categoria_similarity in selected_categories:
         all_sims_max = np.random.choice(sims_max, size=len(category_smiles))
     else:
         sims = calculate_internal_pairwise_similarities(category_smiles)
+        print(sims)
         all_sims_max = sims.max(axis=1)
     
     df_combined.loc[category_indices, 'internal_similarity'] = all_sims_max
@@ -292,7 +439,7 @@ for categoria_similarity in selected_categories:
 df_combined['internal_similarity'] = df_combined['internal_similarity'].astype(float)
 
 # Save the combined dataframe (optional)
-df_combined.to_csv(f'mols_gen/{str_date}/combined_molecules_with_descriptors.csv', index=False)
+df_combined.to_csv(f'../mols_gen/{str_date}/combined_molecules_with_descriptors.csv', index=False)
 
 # Define the list of descriptors to compare
 columns_to_compare = DESCRIPTORS.copy() + ['internal_similarity']
@@ -311,7 +458,7 @@ for group1, group2 in comparisons:
     )
     print(f"\nComparison between {group1} and {group2}:")
     print(mytable.tabulate(tablefmt="grid"))
-    mytable.to_csv(f'mols_gen/{str_date}/mytable_res_{group1}_vs_{group2}.csv')
+    mytable.to_csv(f'../mols_gen/{str_date}/mytable_res_{group1}_vs_{group2}.csv')
 
 # Identify categorical features based on the number of unique values
 categorical_features = [
@@ -500,7 +647,7 @@ js_distances_kde = calculate_js_distances_with_histograms(
 )
 
 # Ensure output directory exists
-save_dir = f'mols_gen/{str_date}/graficas_guacamol_random_10K_composite'
+save_dir = f'../mols_gen/{str_date}/{graph_dir_name}'
 os.makedirs(save_dir, exist_ok=True)
 
 js_distances_kde.to_csv(f'{save_dir}/DistBetweenDists.csv')
@@ -556,11 +703,25 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
             'linestyle': '--',
             'fill': False,
             'alpha': 1.0
+        },
+        'defog_strict': {
+            'color': '#e7298a',
+            'linewidth': 2,
+            'linestyle': '--',
+            'fill': False,
+            'alpha': 1.0
+        },
+        'defog_relaxed': {
+            'color': '#66a61e',
+            'linewidth': 2,
+            'linestyle': '--',
+            'fill': False,
+            'alpha': 1.0
         }
     }
 
     # Create the save directory
-    save_dir = f"mols_gen/{directories[0]}/graficas_guacamol_random_10K_composite"
+    save_dir = f"../mols_gen/{directories[0]}/{graph_dir_name}"
     os.makedirs(save_dir, exist_ok=True)
 
     # Use specific selected features instead of random selection
@@ -573,7 +734,20 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
         'NumHDonors'          # Tier 2 - Lose against both
     ]
 
-    # Create a figure with GridSpec: 2 rows and 4 columns. The last column will span both rows for the log JS ratios plot.
+    # Determine how many comparison models we have
+    comparison_models = []
+    if 'jtvae' in selected_categories:
+        comparison_models.append('jtvae')
+    if 'digress' in selected_categories:
+        comparison_models.append('digress')
+    if 'defog_strict' in selected_categories:
+        comparison_models.append('defog_strict')
+    if 'defog_relaxed' in selected_categories:
+        comparison_models.append('defog_relaxed')
+    
+    num_comparisons = len(comparison_models)
+    
+    # Create a figure with GridSpec: 2 rows and 4 columns. The last column will have separate subplots for each comparison.
     fig = plt.figure(figsize=(30, 12)) # Increased figure size for better visualization
     gs = gridspec.GridSpec(2, 4, width_ratios=[1, 1, 1, 1])
 
@@ -584,8 +758,13 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
             ax = fig.add_subplot(gs[i, j])
             distribution_axes.append(ax)
 
-    # Create one axis for the log JS ratios plot in the last column spanning both rows
-    ax_log = fig.add_subplot(gs[:, 3])
+    # Create separate axes for each comparison in the last column
+    # Split the last column into num_comparisons subplots
+    gs_right = gridspec.GridSpecFromSubplotSpec(num_comparisons, 1, subplot_spec=gs[:, 3], hspace=0.3)
+    comparison_axes = []
+    for i in range(num_comparisons):
+        ax = fig.add_subplot(gs_right[i])
+        comparison_axes.append(ax)
 
     # Plot distributions for each of the 6 randomly selected features
     for idx, (ax, feature) in enumerate(zip(distribution_axes, selected_features)):
@@ -613,7 +792,7 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
                 bin_edges = np.append(bin_edges, bin_edges[0] + 1)
             
             # Plot categories in desired order
-            plot_order = ['ori', 'gen_' + directories[0], 'digress', 'jtvae']
+            plot_order = ['gen_' + directories[0], 'digress', 'jtvae', 'defog_strict', 'defog_relaxed', 'ori']
             for cat in plot_order:
                 if cat not in selected_categories:
                     continue
@@ -636,6 +815,10 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
                             label = f"Digress"
                         elif cat == 'jtvae':
                             label = f"JTVAE"
+                        elif cat == 'defog_strict':
+                            label = f"DeFog strict"
+                        elif cat == 'defog_relaxed':
+                            label = f"DeFog relaxed"
                         else:
                             label = f"{cat}"
                     
@@ -644,7 +827,8 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
                         js_text = f"JS: {js_values[0]:.3f}"
                         # Position in the right area, with slight vertical offsets to prevent overlap
                         # Using js_y_base to position higher for plots E and F
-                        ax.text(0.95, js_y_base + (0.075 * (cat == 'gen_' + directories[0])) - (0.075 * (cat == 'jtvae')) + (0.0 * (cat == 'digress')), 
+                        # Order from top to bottom: CoCoGraph, Digress, JTVAE, DeFog strict, DeFog relaxed
+                        ax.text(0.95, js_y_base + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')), 
                                 js_text, transform=ax.transAxes, fontsize=22, weight='bold',
                                 color=style['color'], ha='right', va='center', fontname='Nimbus Sans')
                     
@@ -688,7 +872,7 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
             max_val = dataframe[dataframe['category'].isin(selected_categories)][feature].max()
             
             # Plot categories in desired order
-            plot_order = [ 'gen_' + directories[0], 'digress', 'jtvae', 'ori']
+            plot_order = ['gen_' + directories[0], 'digress', 'jtvae', 'defog_strict', 'defog_relaxed', 'ori']
             for cat in plot_order:
                 if cat not in selected_categories:
                     continue
@@ -709,6 +893,10 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
                         label = f"Digress"
                     elif cat == 'jtvae':
                         label = f"JTVAE"
+                    elif cat == 'defog_strict':
+                        label = f"DeFog strict"
+                    elif cat == 'defog_relaxed':
+                        label = f"DeFog relaxed"
                     else:
                         label = f"{cat}"
                 
@@ -717,7 +905,8 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
                     js_text = f"JS: {js_values[0]:.3f}"
                     # Position in the right area, with slight vertical offsets to prevent overlap
                     # Using js_y_base to position higher for plots E and F
-                    ax.text(0.95, js_y_base + (0.075 * (cat == 'gen_' + directories[0])) - (0.075 * (cat == 'jtvae')) + (0.0 * (cat == 'digress')), 
+                    # Order from top to bottom: CoCoGraph, Digress, JTVAE, DeFog strict, DeFog relaxed
+                    ax.text(0.95, js_y_base + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')), 
                             js_text, transform=ax.transAxes, fontsize=22, weight='bold',
                             color=style['color'], ha='right', va='center', fontname='Nimbus Sans')
                 
@@ -777,88 +966,124 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
         first_ax = distribution_axes[0]
         handles, labels = first_ax.get_legend_handles_labels()
         if handles:
-            first_ax.legend(handles, labels, fontsize=22)
+            first_ax.legend(handles, labels, fontsize=22, loc='upper left', bbox_to_anchor=(0.15, 1.0))
 
-    # Now, create the log JS ratios plot on the last column axis (ax_log) with vertical orientation
+    # Now, create separate log JS ratios plots for each comparison model
     pd.set_option('display.max_columns', None)
     pd.reset_option('display.max_columns')
-    js_ratios_digress = []
-    js_ratios_jtvae = []
-    for feat in features:
-        js_our_model = js_distances[
-            (js_distances['Feature'] == feat) &
-            (js_distances['Category1'] == 'ori') &
-            (js_distances['Category2'] == 'gen_' + directories[0])
-        ]['JS_Distance'].values
+    
+    # Calculate JS ratios for each comparison model
+    js_ratios_dict = {}
+    better_features_dict = {}
+    worse_features_dict = {}
+    
+    for model in comparison_models:
+        js_ratios = []
+        for feat in features:
+            js_our_model = js_distances[
+                (js_distances['Feature'] == feat) &
+                (js_distances['Category1'] == 'ori') &
+                (js_distances['Category2'] == 'gen_' + directories[0])
+            ]['JS_Distance'].values
+            
+            js_model = js_distances[
+                (js_distances['Feature'] == feat) &
+                (js_distances['Category1'] == 'ori') &
+                (js_distances['Category2'] == model)
+            ]['JS_Distance'].values
+            
+            if len(js_our_model) > 0 and len(js_model) > 0:
+                js_our_model = np.where(js_our_model == 0, 0.0001, js_our_model)
+                js_model = np.where(js_model == 0, 0.0001, js_model)
+                js_ratio = np.log2(js_model / js_our_model)
+                js_ratios.extend(js_ratio)
         
-        js_digress = js_distances[
-            (js_distances['Feature'] == feat) &
-            (js_distances['Category1'] == 'ori') &
-            (js_distances['Category2'] == 'digress')
-        ]['JS_Distance'].values
+        js_ratios_dict[model] = js_ratios
+        better_features_dict[model] = int(np.sum(np.array(js_ratios) > 0))
+        worse_features_dict[model] = int(np.sum(np.array(js_ratios) < 0))
+    
+    bins_vals = np.arange(-4, 4.5, 0.5)
+    
+    # Model display names
+    model_display_names = {
+        'jtvae': 'JTVAE',
+        'digress': 'Digress',
+        'defog_strict': 'DeFog strict',
+        'defog_relaxed': 'DeFog relaxed'
+    }
+    
+    # Create a separate plot for each comparison model
+    for idx, (model, ax_log) in enumerate(zip(comparison_models, comparison_axes)):
+        js_ratios = js_ratios_dict[model]
         
-        js_jtvae = js_distances[
-            (js_distances['Feature'] == feat) &
-            (js_distances['Category1'] == 'ori') &
-            (js_distances['Category2'] == 'jtvae')
-        ]['JS_Distance'].values
+        # Add background shading
+        ax_log.axvspan(-4, 0, color='#e6e6e6', alpha=0.7)
         
-        if len(js_our_model) > 0:
-            js_our_model = np.where(js_our_model == 0, 0.0001, js_our_model)
-            if len(js_digress) > 0:
-                js_digress = np.where(js_digress == 0, 0.0001, js_digress)
-                js_ratio = np.log2(js_digress / js_our_model)
-                js_ratios_digress.extend(js_ratio)
-            if len(js_jtvae) > 0:
-                js_jtvae = np.where(js_jtvae == 0, 0.0001, js_jtvae)
-                js_ratio = np.log2(js_jtvae / js_our_model)
-                js_ratios_jtvae.extend(js_ratio)
-    
-    better_features_digress = int(np.sum(np.array(js_ratios_digress) > 0))
-    worse_features_digress = int(np.sum(np.array(js_ratios_digress) < 0))
-    equal_features_digress = int(np.sum(np.array(js_ratios_digress) == 0))
-    better_features_jtvae = int(np.sum(np.array(js_ratios_jtvae) > 0))
-    worse_features_jtvae = int(np.sum(np.array(js_ratios_jtvae) < 0))
-    equal_features_jtvae = int(np.sum(np.array(js_ratios_jtvae) == 0))
-    
-    bins_vals = np.arange(-4, 4.25, 0.25)
-    
-    ax_log.axvspan(-4, 0, color='#e6e6e6', alpha=0.7)
-    
-    sns.histplot(js_ratios_jtvae, bins=bins_vals,
-                 color=category_styles['jtvae']['color'],
-                 alpha=0.5,
-                 fill=True,
-                 edgecolor=None,
-                 label="JTVAE",
-                 orientation="horizontal", ax=ax_log)
-    ax_log.grid(False)  # Remove grid from log ratio plot
-    sns.histplot(js_ratios_digress, bins=bins_vals,
-                 color=category_styles['digress']['color'],
-                 alpha=0.5,
-                 fill=True,
-                 edgecolor=None,
-                 label="Digress",
-                 orientation="horizontal", ax=ax_log)
-    
-    ax_log.set_xlabel('Performance log2 ratio, R')
-    ax_log.set_ylabel('Frequency')
-    
-    # Add background text annotations with updated colors, smaller font size and increased opacity
-    y_limit = ax_log.get_ylim()[1]
-    ax_log.text(2, y_limit * 0.9, 'Better:', color='black', fontsize=24, ha='center', weight='bold', fontname='Nimbus Sans', zorder=0, alpha=1.0)
-    ax_log.text(2, y_limit * 0.86, f"{better_features_jtvae} vs JTVAE", color=category_styles['jtvae']['color'], fontsize=24, ha='center', weight='bold', fontname='Nimbus Sans', zorder=0, alpha=1.0)
-    ax_log.text(2, y_limit * 0.82, f"{better_features_digress} vs Digress", color=category_styles['digress']['color'], fontsize=24, ha='center', weight='bold', fontname='Nimbus Sans', zorder=0, alpha=1.0)
-    ax_log.text(-2, y_limit * 0.9, 'Worse:', color='black', fontsize=24, ha='center', weight='bold', fontname='Nimbus Sans', zorder=0, alpha=1.0)
-    ax_log.text(-2, y_limit * 0.86, f"{worse_features_jtvae} vs JTVAE", color=category_styles['jtvae']['color'], fontsize=24, ha='center', weight='bold', fontname='Nimbus Sans', zorder=0, alpha=1.0)
-    ax_log.text(-2, y_limit * 0.82, f"{worse_features_digress} vs Digress", color=category_styles['digress']['color'], fontsize=24, ha='center', weight='bold', fontname='Nimbus Sans', zorder=0, alpha=1.0)
+        # Plot histogram
+        sns.histplot(js_ratios, bins=bins_vals,
+                     color=category_styles[model]['color'],
+                     alpha=0.7,
+                     fill=True,
+                     edgecolor='black',
+                     linewidth=1.5,
+                     label=model_display_names[model],
+                     orientation="horizontal", ax=ax_log)
+        ax_log.grid(False)
+        
+        # Set labels
+        if idx == len(comparison_models) - 1:  # Only set xlabel on bottom plot
+            ax_log.set_xlabel('Performance log2 ratio, R', fontsize=26)
+        else:
+            ax_log.set_xlabel('')
+            # Hide x-axis tick labels for all but the bottom plot
+            ax_log.set_xticklabels([])
+        ax_log.set_ylabel('Frequency', fontsize=26)
+        
+        # Add text annotations
+        y_limit = ax_log.get_ylim()[1]
+        ax_log.text(3, y_limit * 0.85, 'Better:', color='black', fontsize=20, 
+                    ha='center', weight='bold', fontname='Nimbus Sans', zorder=10, alpha=1.0)
+        ax_log.text(3, y_limit * 0.70, f"{better_features_dict[model]}", 
+                    color=category_styles[model]['color'], fontsize=20, 
+                    ha='center', weight='bold', fontname='Nimbus Sans', zorder=10, alpha=1.0)
+        
+        ax_log.text(-3, y_limit * 0.85, 'Worse:', color='black', fontsize=20, 
+                    ha='center', weight='bold', fontname='Nimbus Sans', zorder=10, alpha=1.0)
+        ax_log.text(-3, y_limit * 0.70, f"{worse_features_dict[model]}", 
+                    color=category_styles[model]['color'], fontsize=20, 
+                    ha='center', weight='bold', fontname='Nimbus Sans', zorder=10, alpha=1.0)
+        
+        # Add title with colored model name using text objects
+        # Position title manually for better control over colors
+        title_y_pos = 1.05  # Position above the plot
+        # Add "CoCoGraph" in black on the left
+        ax_log.text(0.42, title_y_pos, 'CoCoGraph', transform=ax_log.transAxes, 
+                   fontsize=24, weight='bold', fontname='Nimbus Sans', 
+                   ha='right', va='bottom', color='black')
+        # Add "vs" in black in the center
+        ax_log.text(0.5, title_y_pos, 'vs', transform=ax_log.transAxes, 
+                   fontsize=24, weight='bold', fontname='Nimbus Sans', 
+                   ha='center', va='bottom', color='black')
+        # Add model name in its color on the right
+        ax_log.text(0.58, title_y_pos, f'{model_display_names[model]}', transform=ax_log.transAxes, 
+                   fontsize=24, weight='bold', fontname='Nimbus Sans', 
+                   ha='left', va='bottom', color=category_styles[model]['color'])
+        
+        # Add letter label
+        letter = chr(97 + len(distribution_axes) + idx)
+        ax_log.text(0.02, 0.98, letter, transform=ax_log.transAxes, fontsize=28, 
+                   fontweight='bold', va='top', ha='left', fontname='Nimbus Sans')
+        
+        # Set tick colors to black
+        ax_log.tick_params(axis='both', colors='black', labelsize=20)
+        for spine in ax_log.spines.values():
+            spine.set_color('black')
+        
+        # Format y-axis to show raw numbers instead of scientific notation
+        ax_log.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: format(int(x), 'd')))
+        ax_log.set_ylim(bottom=0)  # Start y-axis at zero
 
     sns.despine()
-    
-    # Add letter label to the log2 ratio plot (will be the last letter)
-    last_letter = chr(97 + len(distribution_axes))  # After all distribution plots
-    ax_log.text(0.02, 0.98, last_letter, transform=ax_log.transAxes, fontsize=28, 
-               fontweight='bold', va='top', ha='left', fontname='Nimbus Sans')
     
     # Increase font sizes for legends, axis titles, and tick labels for all subplots
     for ax in fig.get_axes():
@@ -972,7 +1197,7 @@ feature_importance_df = pd.DataFrame(feature_importance_df)
 feature_importance_df = feature_importance_df.sort_values(by=['Importance_Tier', 'Feature'])
 
 # Ensure consistency in save_dir definition
-save_dir = f"mols_gen/{directories[0]}/graficas_guacamol_random_10K_composite"
+save_dir = f"../mols_gen/{directories[0]}/{graph_dir_name}"
 os.makedirs(save_dir, exist_ok=True)
 
 # Save to CSV
