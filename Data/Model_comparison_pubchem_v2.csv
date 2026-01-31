@@ -1,0 +1,103 @@
+Model, tipo, train, test, V, VU, VUN, KL, KL36, KL_novel, NvsPC, VUNvsPC
+CoCoGraphBASE, DTDSDiff, N<70, PC, 100, 99.8, 99.8, 95.0, -, -
+CoCoGraphBASE, DTDSDiff, N<70, PC, 100, 99.8, 99.8, 96.0, -, -
+CoCoGraphBASE, DTDSDiff, N<70, PC, 100, 99.8, 99.8, 96.0, -, -
+CoCoGraphBASE, DTDSDiff, N<70, PC, 100, 99.8, 99.8, 95.9, -, -
+CoCoGraphBASE, DTDSDiff, N<70, PC, 100, 99.8, 99.7, 95.8, -, -
+CoCoGraphBASE_MEAN, DTDSDiff, N<70, PC, 100.00+-0.00, 99.80+-0.00, 99.78+-0.04, 95.74+-0.42, -, -, 96.15, 95.73
+---------
+CoCoGraphFPS, DTDSDiff, N<70, PC, 100, 99.9, 99.8, 95.6, 95.4, 96.6
+CoCoGraphFPS, DTDSDiff, N<70, PC, 100, 99.9, 99.9, 96.4, 95.4, 96.5
+CoCoGraphFPS, DTDSDiff, N<70, PC, 100, 99.9, 99.8, 96.5, 95.4, 95.6
+CoCoGraphFPS, DTDSDiff, N<70, PC, 100, 99.9, 99.8, 96.4, 95.0, 95.7
+CoCoGraphFPS, DTDSDiff, N<70, PC, 100, 99.9, 99.9, 96.4, 95.3, 96.4
+CoCoGraphFPS_MEAN, DTDSDiff, N<70, PC, 100.00+-0.00, 99.90+-0.00, 99.84+-0.05, 96.26+-0.37, 95.30+-0.17, 96.16+-0.47, 96.08, 95.73
+---------
+CoCoGraphFPS, DTDSDiff, g<70, PC, 100, 100, 99.9, 93.9, 92.0, 93.9
+CoCoGraphFPS, DTDSDiff, g<70, PC, 100, 100, 99.9, 93.8, 92.2, 93.8
+CoCoGraphFPS, DTDSDiff, g<70, PC, 100, 100, 99.9, 94.1, 92.4, 94.1
+CoCoGraphFPS, DTDSDiff, g<70, PC, 100, 100, 99.9, 93.3, 92.2, 93.3
+CoCoGraphFPS, DTDSDiff, g<70, PC, 100, 100, 99.9, 93.8, 92.2, 93.8
+CoCoGraphFPS_MEAN, DTDSDiff, g<70, PC, 100.00+-0.00, 100.00+-0.00, 99.90+-0.00, 93.78+-0.29, 92.20+-0.14, 93.78+-0.29, -, -
+---------
+CoCoGraphFPS_beam1, DTDSDiff, g<70, PC, 100, 99.9, 99.8, 92.2, 92.5, 92.2
+CoCoGraphFPS_beam1, DTDSDiff, g<70, PC, 100, 99.9, 99.9, 92.2, 92.6, 92.2
+CoCoGraphFPS_beam1, DTDSDiff, g<70, PC, 100, 99.9, 99.9, 92.4, 92.8, 92.3
+CoCoGraphFPS_beam1, DTDSDiff, g<70, PC, 100, 99.9, 99.9, 91.5, 92.5, 91.5
+CoCoGraphFPS_beam1, DTDSDiff, g<70, PC, 100, 99.9, 99.9, 92.1, 92.6, 92.1
+CoCoGraphFPS_beam1_MEAN, DTDSDiff, g<70, PC, 100.00+-0.00, 99.90+-0.00, 99.88+-0.04, 92.08+-0.34, 92.60+-0.12, 92.06+-0.32, -, -
+---------
+defogstrict, flowmatching, g<70, PC, 90.4, 90.4, 90.2, 93.6, 92.7, 93.7
+defogstrict, flowmatching, g<70, PC, 90.4, 90.4, 90.3, 93.5, 92.8, 93.7
+defogstrict, flowmatching, g<70, PC, 90.4, 90.4, 90.3, 93.8, 92.9, 93.8
+defogstrict, flowmatching, g<70, PC, 90.4, 90.4, 90.3, 93.5, 92.7, 93.8
+defogstrict, flowmatching, g<70, PC, 90.4, 90.4, 90.3, 93.5, 92.8, 93.5
+defogstrict_MEAN, flowmatching, g<70, PC, 90.40+-0.00, 90.40+-0.00, 90.28+-0.04, 93.58+-0.13, 92.78+-0.08, 93.70+-0.12, 94.26, 85.25
+---------
+defogrelaxed, flowmatching, g<70, PC, 98.5, 98.5, 98.3, 93.4, 93.0, 93.5
+defogrelaxed, flowmatching, g<70, PC, 98.5, 98.5, 98.4, 93.3, 93.2, 93.5
+defogrelaxed, flowmatching, g<70, PC, 98.5, 98.5, 98.4, 93.7, 93.3, 93.6
+defogrelaxed, flowmatching, g<70, PC, 98.5, 98.5, 98.4, 93.3, 93.2, 93.8
+defogrelaxed, flowmatching, g<70, PC, 98.5, 98.5, 98.4, 93.4, 93.3, 93.5
+defogrelaxed_MEAN, flowmatching, g<70, PC, 98.50+-0.00, 98.50+-0.00, 98.38+-0.04, 93.42+-0.16, 93.20+-0.12, 93.58+-0.13, 94.4, 93.04
+---------
+DiGress, DTDSDiff, g<70, PC, 83.4, 83.4, 83.3, 91.2, 92.0, 91.5
+DiGress, DTDSDiff, g<70, PC, 83.4, 83.4, 83.3, 91.3, 92.2, 91.6
+DiGress, DTDSDiff, g<70, PC, 83.4, 83.4, 83.3, 91.5, 92.2, 91.6
+DiGress, DTDSDiff, g<70, PC, 83.4, 83.4, 83.3, 91.4, 92.0, 91.5
+DiGress, DTDSDiff, g<70, PC, 83.4, 83.4, 83.4, 91.5, 92.1, 91.3
+DiGress_MEAN, DTDSDiff, g<70, PC, 83.40+-0.00, 83.40+-0.00, 83.32+-0.04, 91.38+-0.13, 92.10+-0.10, 91.50+-0.12, 97.72, 81.57
+---------
+GDSS, CTDSDiff, g<70, PC, 95.7, 94.3, 94.1, 70.0, 72.5, 69.4
+GDSS, CTDSDiff, g<70, PC, 95.7, 94.3, 94.1, 69.7, 72.5, 69.9
+GDSS, CTDSDiff, g<70, PC, 95.7, 94.3, 94.2, 69.6, 72.8, 69.3
+GDSS, CTDSDiff, g<70, PC, 95.7, 94.3, 94.2, 70.3, 72.2, 69.6
+GDSS, CTDSDiff, g<70, PC, 95.7, 94.3, 94.2, 69.3, 72.0, 69.3
+GDSS_MEAN, CTDSDiff, g<70, PC, 95.70+-0.00, 94.30+-0.00, 94.16+-0.05, 69.78+-0.38, 72.40+-0.31, 69.50+-0.25, 95.16, 90.99
+
+---------
+GruM, CTDSDiff, g<70, PC, 98.5, 98.4, 98.3, 86.9, 85.2, 86.8
+GruM, CTDSDiff, g<70, PC, 98.5, 98.4, 98.3, 86.5, 85.1, 86.4
+GruM, CTDSDiff, g<70, PC, 98.5, 98.4, 98.3, 86.8, 85.3, 86.4
+GruM, CTDSDiff, g<70, PC, 98.5, 98.4, 98.3, 86.5, 85.9, 87.3
+GruM, CTDSDiff, g<70, PC, 98.5, 98.4, 98.3, 86.2, 85.3, 86.1
+GruM_MEAN, CTDSDiff, g<70, PC, 98.50+-0.00, 98.40+-0.00, 98.30+-0.00, 86.58+-0.28, 85.36+-0.31, 86.60+-0.46, 94.42, 92.93
+
+--------- #no actualizado
+CDMOL, DTDSDiff, g<70, PC, 85.0, 75.1, 75.1, 95.5.94.9.95.4
+CDMOL, DTDSDiff, g<70, PC, 85.0, 75.1, 75.1, 95.3.94.8.95.0
+CDMOL, DTDSDiff, g<70, PC, 85.0, 75.1, 75.1, 95.5.95.0.95.2
+CDMOL, DTDSDiff, g<70, PC, 85.0, 75.1, 75.1, 95.2.94.8.95.1
+CDMOL, DTDSDiff, g<70, PC, 85.0, 75.1, 75.1, 95.2.94.9.95.1
+CDMOL_MEAN, DTDSDiff, g<70, PC, 85.00+-0.00, 75.10+-0.00, 75.10+-0.00, 95.34+-0.14, 94.88+-0.07, 95.16+-0.14, -, -
+
+---------
+JTVAE, VAE, z<70, PC, 100, 99.9, 99.8, 56.6, -, -
+JTVAE, VAE, z<70, PC, 100, 99.9, 99.8, 54.7, -, -
+JTVAE, VAE, z<70, PC, 100, 99.9, 99.7, 56.0, -, -
+JTVAE, VAE, z<70, PC, 100, 99.9, 99.7, 55.7, -, -
+JTVAE, VAE, z<70, PC, 100, 99.9, 99.6, 54.6, -, -
+JTVAE_MEAN, VAE, z<70, PC, 100.00+-0.00, 99.90+-0.00, 99.72+-0.08, 55.52+-0.86, -, -, -, -
+
+---------
+CoCoGraphFPS_notime, DTDSDiff, N<70, PC, 100, 100, 99.8, 93.4, -, -
+CoCoGraphFPS_notime, DTDSDiff, N<70, PC, 100, 100, 99.9, 94.6, -, -
+CoCoGraphFPS_notime, DTDSDiff, N<70, PC, 100, 100, 99.9, 94.8, -, -
+CoCoGraphFPS_notime, DTDSDiff, N<70, PC, 100, 100, 99.9, 94.6, -, -
+CoCoGraphFPS_notime, DTDSDiff, N<70, PC, 100, 100, 99.9, 94.5, -, -
+CoCoGraphFPS_notime_MEAN, DTDSDiff, N<70, PC, 100.00+-0.00, 100.00+-0.00, 99.88+-0.04, 94.38+-0.56, -, -, 97.56, 97.52
+---------
+CoCoGraphFPS_unseed, DTDSDiff, N<70, PC, 100, 99.9, 99.8, 94.5, -, -
+CoCoGraphFPS_unseed, DTDSDiff, N<70, PC, 100, 99.9, 99.8, 95.5, -, -
+CoCoGraphFPS_unseed, DTDSDiff, N<70, PC, 100, 99.9, 99.8, 95.7, -, -
+CoCoGraphFPS_unseed, DTDSDiff, N<70, PC, 100, 99.9, 99.8, 95.5, -, -
+CoCoGraphFPS_unseed, DTDSDiff, N<70, PC, 100, 99.9, 99.8, 95.5, -, -
+CoCoGraphFPS_unseed_MEAN, DTDSDiff, N<70, PC, 100.00+-0.00, 99.90+-0.00, 99.80+-0.00, 95.34+-0.43, -, -, 96.22, 95.89
+---------
+RVDES, -, N<70, PC, 100, 100, 99.8, 87.0, -, -
+RVDES, -, N<70, PC, 100, 100, 99.9, 87.2, -, -
+RVDES, -, N<70, PC, 100, 100, 99.9, 87.2, -, -
+RVDES, -, N<70, PC, 100, 100, 99.8, 87.4, -, -
+RVDES, -, N<70, PC, 100, 100, 99.9, 87.2, -, -
+RVDES_MEAN, -, N<70, PC, 100.00+-0.00, 100.00+-0.00, 99.86+-0.05, 87.20+-0.13, -, -, 98.5, 98.5
+

@@ -170,6 +170,7 @@ parser.add_argument('-jtvae', action='store_true', help='Include jtvae in compar
 parser.add_argument('-digress', action='store_true', help='Include digress in comparison')
 parser.add_argument('-defog_strict', action='store_true', help='Include DeFOG strict in comparison')
 parser.add_argument('-defog_relaxed', action='store_true', help='Include DeFOG relaxed in comparison')
+parser.add_argument('-hablation', action='store_true', help='Include Time hablation model in comparison')
 parser.add_argument('-real', action='store_true', help='Include real in comparison')
 parser.add_argument('-ref', '--reference', type=str, help='The reference category for comparison')
 parser.add_argument('-dir', '--directory', nargs='+', help='Directory or list of directories to compare')
@@ -210,6 +211,8 @@ if args.defog_strict:
     selected_categories.append('defog_strict')
 if args.defog_relaxed:
     selected_categories.append('defog_relaxed')
+if args.hablation:
+    selected_categories.append('hablation')
 if args.real:
     selected_categories.append('real')
 
@@ -225,8 +228,8 @@ if args.reference not in selected_categories:
 
 reference_category = args.reference
 
-if len(selected_categories) not in [2, 3, 4, 5, 6, 7]:
-    raise ValueError("You must select either two or three categories for comparison.")
+if len(selected_categories) not in [2, 3, 4, 5, 6, 7, 8]:
+    raise ValueError("You must select between 2 and 8 categories for comparison.")
 
 # If more than two categories, generate all combinations
 if len(selected_categories) != 2:
@@ -261,7 +264,7 @@ else:
         with open(smiles_path, 'r') as f:
             smiles_pool = [line.strip() for line in tqdm(f, desc="Loading SMILES") if line.strip()]
     elif args.ori == 'pubchem':
-        smiles_path = '../Data/CID-SMILES-filtered-lt70.txt'
+        smiles_path = '../Data/CID-SMILES-filtered-lt70-notraining.txt'
         print(f"Loading pubchem molecules from {smiles_path}...")
         with open(smiles_path, 'r') as f:
             smiles_pool = [line.strip() for line in tqdm(f, desc="Loading SMILES") if line.strip()]
@@ -304,6 +307,26 @@ else:
         df_defog_relaxed['category'] = 'defog_relaxed'
     else:
         df_defog_relaxed = None
+    
+    # Load hablation model if requested
+    hablation_dir = '251010_database_allmolecules_main_2_22_confps_timepred_2_22_confps_sinexplicit_notime'
+    hablation_path = f'../mols_gen/{hablation_dir}/all_generated_molecules.csv'
+    if args.hablation and os.path.exists(hablation_path):
+        print(f"Loading hablation model from {hablation_path}...")
+        df_hablation = pd.read_csv(hablation_path)
+        # Check if the dataframe has 'smiles_gen' column, otherwise try 'smiles'
+        if 'smiles_gen' in df_hablation.columns:
+            df_hablation = df_hablation[['smiles_gen']]
+            df_hablation = df_hablation.rename(columns={'smiles_gen': 'smiles'})
+        elif 'smiles' in df_hablation.columns:
+            df_hablation = df_hablation[['smiles']]
+        else:
+            raise ValueError(f"Could not find 'smiles' or 'smiles_gen' column in {hablation_path}")
+        df_hablation['category'] = 'hablation'
+        # Apply <70 atoms filter before computing descriptors
+        df_hablation = filter_df_smiles_lt70(df_hablation, 'smiles')
+    else:
+        df_hablation = None
 
     # Rename columns to have the same name across dataframes
     df_ori = df_ori.rename(columns={'smiles_ori': 'smiles'})
@@ -343,6 +366,8 @@ else:
         df_defog_strict = add_descriptors(df_defog_strict, 'smiles', n_jobs=args.n_jobs)
     if df_defog_relaxed is not None:
         df_defog_relaxed = add_descriptors(df_defog_relaxed, 'smiles', n_jobs=args.n_jobs)
+    if df_hablation is not None:
+        df_hablation = add_descriptors(df_hablation, 'smiles', n_jobs=args.n_jobs)
 
     # Concatenate all DataFrames
     frames = [df_ori, df_gen, df_jtvae, df_digress]
@@ -350,6 +375,8 @@ else:
         frames.append(df_defog_strict)
     if df_defog_relaxed is not None:
         frames.append(df_defog_relaxed)
+    if df_hablation is not None:
+        frames.append(df_hablation)
     df_combined = pd.concat(frames, axis=0).reset_index(drop=True)
 
     # Save the combined dataframe with descriptors for future use
@@ -674,6 +701,13 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
             'linestyle': '--',
             'fill': False,
             'alpha': 1.0
+        },
+        'hablation': {
+            'color': '#e6ab02',
+            'linewidth': 2,
+            'linestyle': '-.',
+            'fill': False,
+            'alpha': 1.0
         }
     }
 
@@ -749,6 +783,8 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
         comparison_models.append('defog_strict')
     if 'defog_relaxed' in selected_categories:
         comparison_models.append('defog_relaxed')
+    if 'hablation' in selected_categories:
+        comparison_models.append('hablation')
     
     num_comparisons = len(comparison_models)
     
@@ -780,7 +816,7 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
                 bin_edges = np.append(bin_edges, bin_edges[0] + 1)
             
             # Plot categories in desired order
-            plot_order = ['gen_' + directories[0], 'digress', 'jtvae', 'defog_strict', 'defog_relaxed', 'ori']
+            plot_order = ['gen_' + directories[0], 'digress', 'jtvae', 'defog_strict', 'defog_relaxed', 'hablation', 'ori']
             for cat in plot_order:
                 if cat not in selected_categories:
                     continue
@@ -807,6 +843,8 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
                             label = f"DeFog strict"
                         elif cat == 'defog_relaxed':
                             label = f"DeFog relaxed"
+                        elif cat == 'hablation':
+                            label = f"Time hablation"
                         else:
                             label = f"{cat}"
                     
@@ -814,22 +852,22 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
                     if cat != reference_category and len(js_values) > 0:
                         js_text = f"JS: {js_values[0]:.3f}"
                         # Special positioning for plots C, F, and H
-                        # Order from top to bottom: CoCoGraph (+0.15), Digress (+0.075), JTVAE (0.0), DeFog strict (-0.075), DeFog relaxed (-0.15)
+                        # Order from top to bottom: CoCoGraph (+0.15), Digress (+0.075), JTVAE (0.0), DeFog strict (-0.075), DeFog relaxed (-0.15), Time hablation (-0.225)
                         if i == 2:  # Plot C (3rd plot)
-                            ax.text(0.95, 0.7 + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')), 
+                            ax.text(0.95, 0.7 + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')) - (0.225 * (cat == 'hablation')), 
                                     js_text, transform=ax.transAxes, fontsize=22, weight='bold',
                                     color=style['color'], ha='right', va='center', fontname='Nimbus Sans')
                         elif i == 5:  # Plot F (6th plot)
-                            ax.text(0.95, 0.7 + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')), 
+                            ax.text(0.95, 0.7 + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')) - (0.225 * (cat == 'hablation')), 
                                     js_text, transform=ax.transAxes, fontsize=22, weight='bold',
                                     color=style['color'], ha='right', va='center', fontname='Nimbus Sans')
                         elif i == 7:  # Plot H (8th plot)
-                            ax.text(0.1, 0.8 + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')), 
+                            ax.text(0.1, 0.8 + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')) - (0.225 * (cat == 'hablation')), 
                                     js_text, transform=ax.transAxes, fontsize=22, weight='bold',
                                     color=style['color'], ha='left', va='center', fontname='Nimbus Sans')
                         else:
                             # Position in the right middle area, with slight vertical offsets to prevent overlap
-                            ax.text(0.95, 0.3 + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')), 
+                            ax.text(0.95, 0.3 + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')) - (0.225 * (cat == 'hablation')), 
                                     js_text, transform=ax.transAxes, fontsize=22, weight='bold',
                                     color=style['color'], ha='right', va='center', fontname='Nimbus Sans')
                     
@@ -870,7 +908,7 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
             max_val = dataframe[dataframe['category'].isin(selected_categories)][feature].max()
             
             # Plot categories in desired order
-            plot_order = [ 'gen_' + directories[0], 'digress', 'jtvae', 'defog_strict', 'defog_relaxed', 'ori']
+            plot_order = [ 'gen_' + directories[0], 'digress', 'jtvae', 'defog_strict', 'defog_relaxed', 'hablation', 'ori']
             for cat in plot_order:
                 if cat not in selected_categories:
                     continue
@@ -895,6 +933,8 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
                         label = f"DeFog strict"
                     elif cat == 'defog_relaxed':
                         label = f"DeFog relaxed"
+                    elif cat == 'hablation':
+                        label = f"Time hablation"
                     else:
                         label = f"{cat}"
                 
@@ -902,22 +942,22 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
                 if cat != reference_category and len(js_values) > 0:
                     js_text = f"JS: {js_values[0]:.3f}"
                     # Special positioning for plots C, F, and H
-                    # Order from top to bottom: CoCoGraph (+0.15), Digress (+0.075), JTVAE (0.0), DeFog strict (-0.075), DeFog relaxed (-0.15)
+                    # Order from top to bottom: CoCoGraph (+0.15), Digress (+0.075), JTVAE (0.0), DeFog strict (-0.075), DeFog relaxed (-0.15), Time hablation (-0.225)
                     if i == 2:  # Plot C (3rd plot)
-                        ax.text(0.95, 0.7 + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')), 
+                        ax.text(0.95, 0.7 + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')) - (0.225 * (cat == 'hablation')), 
                                 js_text, transform=ax.transAxes, fontsize=22, weight='bold',
                                 color=style['color'], ha='right', va='center', fontname='Nimbus Sans')
                     elif i == 5:  # Plot F (6th plot)
-                        ax.text(0.95, 0.7 + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')), 
+                        ax.text(0.95, 0.7 + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')) - (0.225 * (cat == 'hablation')), 
                                 js_text, transform=ax.transAxes, fontsize=22, weight='bold',
                                 color=style['color'], ha='right', va='center', fontname='Nimbus Sans')
                     elif i == 7:  # Plot H (8th plot)
-                        ax.text(0.1, 0.7 + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')), 
+                        ax.text(0.1, 0.7 + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')) - (0.225 * (cat == 'hablation')), 
                                 js_text, transform=ax.transAxes, fontsize=22, weight='bold',
                                 color=style['color'], ha='left', va='center', fontname='Nimbus Sans')
                     else:
                         # Position in the right middle area, with slight vertical offsets to prevent overlap
-                        ax.text(0.95, 0.3 + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')), 
+                        ax.text(0.95, 0.3 + (0.15 * (cat == 'gen_' + directories[0])) + (0.075 * (cat == 'digress')) + (0.0 * (cat == 'jtvae')) - (0.075 * (cat == 'defog_strict')) - (0.15 * (cat == 'defog_relaxed')) - (0.225 * (cat == 'hablation')), 
                                 js_text, transform=ax.transAxes, fontsize=22, weight='bold',
                                 color=style['color'], ha='right', va='center', fontname='Nimbus Sans')
                     
@@ -1027,7 +1067,8 @@ def plot_feature_distributions_with_js(dataframe, features, js_distances, bins=3
         'jtvae': 'JTVAE',
         'digress': 'Digress',
         'defog_strict': 'DeFog strict',
-        'defog_relaxed': 'DeFog relaxed'
+        'defog_relaxed': 'DeFog relaxed',
+        'hablation': 'Time hablation'
     }
     
     # Create a separate plot for each comparison model

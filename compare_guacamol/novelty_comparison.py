@@ -78,8 +78,8 @@ def main():
     parser.add_argument(
         '--reference',
         type=str,
-        default='../Data/CID-SMILES-filtered-lt70.txt',
-        help='Path to reference dataset file (default: ../Data/CID-SMILES-filtered-lt70.txt)'
+        default='../Data/CID-SMILES-filtered-lt70-notraining.txt',
+        help='Path to reference dataset file (default: ../Data/CID-SMILES-filtered-lt70-notraining.txt)'
     )
     parser.add_argument(
         '--num-processes',
