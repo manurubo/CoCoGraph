@@ -123,6 +123,8 @@ The repository is organized as follows:
 - **Data/**: Contains datasets used in the scripts
   - Molecular databases in pickle format
   - Molecular formulas for generation
+  - `CID-SMILES-filtered-lt70_*_notraining.txt`: Filtered PubChem datasets (cross-validation splits) with training molecules removed for benchmarking
+  - `Model_comparison_pubchem_v2.csv`: Benchmark comparison results using PubChem as reference dataset
   - **generated_database/**: Contains large synthetic molecular databases.
     - `all_molecules.csv`: A comprehensive database of 8.2 million generated molecules.
     - `novel_molecules.csv`: A subset of `all_molecules.csv` containing 7.6 million unique and novel molecules.
@@ -166,7 +168,10 @@ The repository is organized as follows:
 - **compare_guacamol/**: Used to compare results and generate graphs for the paper
   - `compare4_composite.py`: Property distribution analysis and visualization script  
   - `compare4_guacamol_composite.py`: Guacamol benchmark evaluation script
+  - `compare4_composite_lt70_timehablation.py`: Time ablation study for property distributions
+  - `compare4_guacamol_composite_lt70_timehablation.py`: Time ablation study for Guacamol benchmarks
   - `Guacamol_Benchmarking_indepence_and_randomedgeswap.ipynb`: Notebook for analyzing noise trajectory independence and random edge swap effects
+  - `Guacamol_Benchmarking_pubchem_freetotal.ipynb`: Notebook for PubChem reference dataset benchmarking
   - Benchmarking scripts against other models (JTVAE, DiGress)
 
 - **models/**: Contains trained model weights
@@ -356,6 +361,30 @@ python sample_scripts/extract_fragment_library.py \
 ```
 
 This creates `Data/fragment_library.txt` with common molecular fragments that can be attached to molecules during inpainting.
+
+### Filtering PubChem Datasets
+
+For benchmarking against external reference datasets like PubChem, you may want to filter out molecules that appear in your training data to ensure fair comparison:
+
+```bash
+python filter_cid_smiles.py \
+       --cid-smiles Data/CID-SMILES-filtered-lt70.txt \
+       --molecules-csv Data/molecules_lt70atoms_annotated.csv \
+       --output Data/CID-SMILES-filtered-lt70 \
+       --num-processes 8
+```
+
+**Parameters:**
+- `--pubchem_file`: Input PubChem CID-SMILES file to filter
+- `--molecules-csv`: CSV file with training molecules to exclude
+- `--guacamol-smiles`: Optional GuacaMol training set to exclude (default: `Data/guacamol_v1_train.smiles`)
+- `--zinc-csv`: Optional ZINC250k training set to exclude (default: `Data/zinc250k.csv`)
+- `--output`: Base path for output files
+- `--num-procs`: Number of processes that run the job
+
+**Output:** Creates filtered dataset for Pubchem database
+
+
 
 ## Unseeded Generation
 
@@ -564,6 +593,29 @@ This script evaluates generated molecules against the Guacamol benchmark, produc
 - Internal similarity calculations
 - Benchmark comparison with JTVAE and DiGress
 - Performance ratio analysis
+
+### Time Ablation Studies
+
+To evaluate the contribution of the time model to generation quality, use the time ablation scripts:
+
+```bash
+# Property distribution comparison with time ablation analysis
+python compare_guacamol/compare4_composite_lt70_timehablation.py \
+       -ori pubchem \
+       -reference ori \
+       -hablation \ 
+       -directory your_experiment_names
+
+# Guacamol benchmark with time ablation analysis
+python compare_guacamol/compare4_guacamol_composite_lt70_timehablation.py \
+       -ori pubchem \
+       --reference ori \
+       --hablation \ 
+       --directory your_experiment_names
+```
+
+These scripts compare models with and without the collaborative time model, helping assess the time model's impact on molecular generation quality.
+
 
 ### Noise Trajectory Analysis
 
