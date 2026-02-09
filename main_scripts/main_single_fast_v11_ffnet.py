@@ -44,7 +44,7 @@ def main(train_dl, model, checkpoint, executor, slice, epoch ):
         
         optimizer_y = torch.optim.Adam(params_y, lr=1e-3)
         optimizer_y.load_state_dict(checkpoint['optimizer_y_state_dict'])
-        optimizer_z = torch.optim.Adam(params_y, lr=1e-3)
+        optimizer_z = torch.optim.Adam(params_z, lr=1e-3)
         optimizer_z.load_state_dict(checkpoint['optimizer_z_state_dict'])
         scheduler_y = torch.optim.lr_scheduler.ExponentialLR(optimizer_y, gamma = 0.995)
         scheduler_z = torch.optim.lr_scheduler.ExponentialLR(optimizer_z, gamma = 0.995)
