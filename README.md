@@ -650,17 +650,15 @@ If you use CoCoGraph in your research, please cite our paper:
 
 ## License
 
-This work is licensed under a [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License](http://creativecommons.org/licenses/by-nc-sa/4.0/).
+This project is licensed under the [MIT License](LICENSE) — the most permissive open-source license, allowing any kind of re-use and usage with minimal requirements.
 
-[![CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](http://creativecommons.org/licenses/by-nc-sa/4.0/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ### You are free to:
-- **Share** — copy and redistribute the material in any medium or format
-- **Adapt** — remix, transform, and build upon the material
+- **Use** — use commercially and privately
+- **Modify** — adapt and change the code
+- **Distribute** — share and redistribute
+- **Sublicense** — use in proprietary projects
 
 ### Under the following terms:
-- **Attribution** — You must give appropriate credit, provide a link to the license, and indicate if changes were made
-- **NonCommercial** — You may not use the material for commercial purposes
-- **ShareAlike** — If you remix, transform, or build upon the material, you must distribute your contributions under the same license as the original
-
-For more details, see the [full license text](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode). 
+- **Attribution** — Include the original license and copyright notice in any copy or substantial portion of the material 
