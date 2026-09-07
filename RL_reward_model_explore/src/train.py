@@ -264,17 +264,13 @@ def compute_batch_loss(
         t_rej = _time_targets_for_graphs(rejected, time_targets, device)
         pred_pref = torch.stack(
             [
-                model.predict_time(
-                    _with_batch(g, device)
-                )
+                model.predict_time(_with_batch(g, device)).reshape(())
                 for g in preferred
             ]
         )
         pred_rej = torch.stack(
             [
-                model.predict_time(
-                    _with_batch(g, device)
-                )
+                model.predict_time(_with_batch(g, device)).reshape(())
                 for g in rejected
             ]
         )

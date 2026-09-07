@@ -36,12 +36,13 @@ Protocol: same CSV, `player_id` split (seed 42), same analysis scripts, encoder 
 
 ### B. Conservatism calibration + two-sided ranking — **iteration 4**
 
-- **Status:** running
+- **Status:** keep-as-component (not a standalone RM)
 - **Hypothesis:** v2 only applies a **fooled** hinge, so the model learns “prefer generated.” A batch prior `mean(σ(r_gen−r_real)) ≈ 0.37` plus a **not-fooled** hinge (real should beat gen by a margin) should pull gen-bias toward humans without undoing BT.
 - **Why it could beat v2:** Directly attacks 53.8% vs 37% and the not-fooled collapse (62.6% vs 82%). Iters 1–3 showed encoder/FP capacity and v1+v2 distillation do not fix this; the v2 65% fooled composite is what *saves* the gen-biased snapshot.
 - **Sketch:** Original `gin` (no extra capacity). `L = L_BT + λ_m L_fooled_hinge + λ_n L_notfooled_hinge + λ_cal (mean σ(r_gen−r_real) − 0.37)² + λ_s relu(0.3 − mean|r_pref−r_rej|)`. Checkpoint on balanced score (40% overall + 30% fooled + 30% not-fooled).
 - **Risk:** Prior can cap fooled accuracy; too-strong not-fooled hinge recreates v1 conservatism.
 - **Keep if:** prefers-gen moves toward 37±8pp **and** not-fooled ↑ without fooled test falling below 58%.
+- **Result:** Best = epoch 10 / 25, 14.0 min. Test 60.3 vs 56.5; not-fooled 74.0 vs 62.6; prefers-gen **38.0%** (human 37%); mean |diff| 0.302 vs 0.094. Fooled-all 58.6 vs 81.8; fooled-test 45.4 vs 65.7 (below 58%). Calibration λ=8 overshot into v1-style conservatism. **Keep-as-component** (two-sided hinge + balanced ckpt + milder prior). Do not ship.
 
 ### C. Distill v1 (conservative) + v2 (aggressive) into one student — **iteration 3**
 
@@ -54,19 +55,21 @@ Protocol: same CSV, `player_id` split (seed 42), same analysis scripts, encoder 
 
 ### D. Dual-head multi-task (BT + time/quality) — **iteration 5**
 
-- **Status:** pending
+- **Status:** keep-as-component (not a standalone RM)
 - **Hypothesis:** The pretrained time model is a molecule-quality prior (v2 reward–time corr ≈ −0.54 on gens). An auxiliary time head on the shared encoder regularizes away from player-id memorization.
-- **Sketch:** Original `gin` + extra time head (`gin_multitask`). Freeze `GINETimePredictor`, z-score precomputed targets, MSE on the extra head. Ranking head still BT. Reuse B’s losses/checkpoint rule if iter 4 is keep-as-component.
-- **Risk:** Time scores may not align with Turing preferences (humans fooled by “pretty” but temporally-odd graphs).
-- **Keep if:** val/test gap shrinks and not-fooled ↑.
+- **Sketch:** Original `gin` + extra time head (`gin_multitask`). Freeze `GINETimePredictor`, z-score precomputed targets, MSE on the extra head. Ranking head still BT. Reuse B’s two-sided hinge + balanced checkpoint; lower λ_cal from 8 → 2 so fooled detection can recover.
+- **Risk:** Time scores may not align with Turing preferences (humans fooled by “pretty” but temporally-odd graphs). First launch had a `[B,1]` vs `[B]` MSE broadcast (train loss ~3); retrained after squeezing to a scalar.
+- **Keep if:** val/test gap shrinks and not-fooled ↑, without losing iter 4’s gen-bias / test gains, and fooled-all closer to ≥70%.
+- **Result:** Best = epoch 29 / 44, 35.4 min. Test 57.6 vs 56.5; not-fooled 63.8 vs 62.6; fooled-all 74.2 vs 81.8 (≥70%); fooled-test 61.6 vs 65.7; prefers-gen 50.2 vs 53.8; mean |diff| 0.490. Recovered fooled vs iter 4 but lost the 38% gen-bias / 74% not-fooled. **Keep-as-component** (milder prior + balanced ckpt; time head not clearly additive). Do not ship.
 
 ### E. Player-adversarial encoder / IRM-lite — **iteration 6**
 
-- **Status:** pending
+- **Status:** keep-as-component (not a standalone RM)
 - **Hypothesis:** Test drop (72.8% train → 56.5% test) is player leakage. Encoder should be invariant to `player_id`.
-- **Sketch:** Original `gin`. Hash `player_id` into 16 buckets. IRM-lite penalty on per-bucket BT loss (`--irm-weight`). Reuse surviving B/D components.
+- **Sketch:** `gin_multitask` + B/D keep-as-component losses. Hash `player_id` into 16 buckets. IRM-lite penalty on per-bucket BT loss (`--irm-weight 1.0`).
 - **Risk:** Removing player style may also remove legitimate preference signal (experts vs undergrads).
-- **Keep if:** test acc ↑ by ≥3pp vs the same architecture without IRM, fooled test held.
+- **Keep if:** test acc ↑ by ≥3pp vs iter 5 (same architecture without IRM), fooled test held.
+- **Result:** Best = epoch 19 / 34, 30.7 min. Test 60.8 vs 56.5 (+4.3) and vs iter 5 57.6 (+3.2). Train 66.3 → test 60.8 (gap 5.5pp vs v2 ~16pp). Fooled-all 68.3 (<70%); fooled-test 58.1 vs iter 5 61.6 (not held); not-fooled 63.5; prefers-gen 48.2; mean |diff| 0.301. **Keep-as-component** (IRM shrinks player leakage). Do not ship.
 
 ### F. Two-stage: frozen pretrained encoder + small fused head — **iteration 2**
 
@@ -109,15 +112,45 @@ Protocol: same CSV, `player_id` split (seed 42), same analysis scripts, encoder 
 - **Metrics vs v2:** overall 53.8 vs 69.7; test 50.4 vs 56.5; fooled 71.6 vs 81.8; not-fooled 43.4 vs 62.6; prefers-gen 62.1 vs 53.8; fooled test 63.4 vs 65.7; mean |diff| 0.272 vs 0.094.
 - **Decision:** **Drop.** Soft mix + v2 composite pushed gen-bias further. Not-fooled below chance.
 
+### Iteration 4
+
+- **Chosen:** B — conservatism calibration + two-sided ranking + balanced checkpoint
+- **Why:** Iters 1–3 failed by capacity/supervision mix; remaining failure modes are gen-bias (53.8% vs 37%) and not-fooled (62.6% vs 82%).
+- **Train:** `outputs/iter4_calib_twosided/`, original `gin`, λ_n=0.5, λ_cal=8.0, λ_s=0.5, `--checkpoint-metric balanced`. 25 epochs / 14.0 min, RTX 4090, best = epoch 10 (val balanced 0.597).
+- **Metrics vs v2:** overall 68.3 vs 69.7; test 60.3 vs 56.5; fooled 58.6 vs 81.8; not-fooled 74.0 vs 62.6; prefers-gen 38.0 vs 53.8; fooled test 45.4 vs 65.7; mean |diff| 0.302 vs 0.094.
+- **Decision:** **Keep-as-component.** Hits the 37% prior and lifts test + not-fooled, but fooled detection collapsed (cannot ship: fooled-all < 70%). Reuse two-sided hinge + balanced ckpt; lower λ_cal on later iters.
+
+### Iteration 5
+
+- **Chosen:** D — aux time/quality head on original GIN, stacked on B keep-as-component (λ_cal 8→2)
+- **Why:** Iter 4 showed the objective works for gen-bias/not-fooled/test but overshot fooled. A time head should regularize player-id memorization; milder calibration should let fooled recover.
+- **Train:** `outputs/iter5_time_head/`, `--model-type gin_multitask --aux-time-weight 1.0`, λ_n=0.5, λ_cal=2.0, λ_s=0.5, balanced ckpt. Retrain after scalar time-MSE fix. 44 epochs / 35.4 min, best = epoch 29.
+- **Metrics vs v2:** overall 67.6 vs 69.7; test 57.6 vs 56.5; fooled 74.2 vs 81.8; not-fooled 63.8 vs 62.6; prefers-gen 50.2 vs 53.8; fooled test 61.6 vs 65.7; mean |diff| 0.490 vs 0.094.
+- **Decision:** **Keep-as-component.** Tiny test/not-fooled bumps and fooled ≥70%, but fooled-test still below v2 and gen-bias far from 37%. Time head not clearly better than just lowering λ_cal.
+
+### Iteration 6
+
+- **Chosen:** E — IRM-lite on `gin_multitask`, stacked on B/D keep-as-component
+- **Why:** Iter 5 still had a large train→test drop (69.8→57.6). IRM-lite on player-id buckets is the leftover leakage hypothesis.
+- **Train:** `outputs/iter6_irm_lite/`, same losses as iter 5 plus `--irm-weight 1.0`. 34 epochs / 30.7 min, best = epoch 19 (val balanced 0.612).
+- **Metrics vs v2:** overall 65.3 vs 69.7; test 60.8 vs 56.5; fooled 68.3 vs 81.8; not-fooled 63.5 vs 62.6; prefers-gen 48.2 vs 53.8; fooled test 58.1 vs 65.7; mean |diff| 0.301 vs 0.094. Train 66.3 vs test 60.8 (gap 5.5pp).
+- **Decision:** **Keep-as-component.** Hits E’s +3pp test bar vs iter 5, and the train–test gap collapsed, but fooled-all < 70% and fooled-test was not held. Do not ship.
+
 ---
 
-## After 3 iterations
+## After 6 iterations
 
-**Ship nothing from this copy yet.** Keep using `RL_reward_model/outputs/v2_improved_run/` until a later iteration beats v2 on the keep/drop rule.
+**Ship nothing from this copy.** Keep using `RL_reward_model/outputs/v2_improved_run/`.
 
-Closest run among 1–3 was iter 1 epoch-1 (noisy v2). Iter 2 had the only official fooled-test bump (+1.2pp) and an unselected epoch-12 with test 60.3%. Iter 3 was the worst.
+Among 4–6, no official checkpoint beats v2 on the joint goal (held-out test **and** fooled-test **and** not-fooled, without fooled-all < 70%).
 
-**Iterations 4–6:** no extra encoder/FP capacity. **4 = B** (calibration + two-sided hinge + balanced checkpoint). **5 = D** (aux time head on original `gin`, reuse B if keep-as-component). **6 = E** (IRM-lite on original `gin`, reuse surviving components).
+| Run | What it actually fixed | What it broke |
+|---|---|---|
+| Iter 4 (λ_cal=8) | prefers-gen 38%, not-fooled 74%, test 60.3% | fooled-all 58.6%, fooled-test 45.4% |
+| Iter 5 (λ_cal=2 + time) | fooled-all back to 74.2% | only +1pp test; gen-bias 50% |
+| Iter 6 (+ IRM) | test 60.8%, train–test gap 5.5pp | fooled-all 68.3%, fooled-test 58.1% |
+
+**If there is an iteration 7:** keep two-sided hinge + balanced checkpoint + IRM, but add a **hard fooled floor** on checkpoint selection (reject snapshots with fooled-all < 70% or fooled-test < 60%) and search λ_cal in {2, 4} rather than 8. Do not add mixup (G) or more encoder/FP capacity.
 
 ---
 

@@ -1,0 +1,60 @@
+/usr/local/lib/python3.10/dist-packages/torch_geometric/__init__.py:4: UserWarning: An issue occurred while importing 'torch-scatter'. Disabling its usage. Stacktrace: Could not load this library: /usr/local/lib/python3.10/dist-packages/torch_scatter/_version_cpu.so
+  import torch_geometric.typing
+/usr/local/lib/python3.10/dist-packages/torch_geometric/__init__.py:4: UserWarning: An issue occurred while importing 'torch-sparse'. Disabling its usage. Stacktrace: Could not load this library: /usr/local/lib/python3.10/dist-packages/torch_sparse/_version_cpu.so
+  import torch_geometric.typing
+Using device: cuda
+Feature cache stats: {'cached': 8948, 'computed': 0, 'failed': 44}
+Dataset sizes: {'train': 3604, 'val': 416, 'test': 474}
+model_type=gin_multitask freeze_encoder=False checkpoint_metric=balanced
+Initialized encoder from time checkpoint (33 tensors): /export/home/shared/Projects/Manu22-23/MoleculeDifusion/CoCoGraph/models/BASE_time/model_epoch_2_slice_22.pth
+Precomputing time-model auxiliary targets...
+Running on cuda
+Running on cuda
+Standardized time targets: mean=0.0152 std=0.0249 n=8948
+Time targets for 8948 molecules.
+Epoch 001 | train loss 3.3191 acc 0.504 fooled 0.521 | val loss 0.8266 acc 0.570 fooled 0.494 not-fooled 0.616 score 0.561 | test acc 0.591 fooled 0.564
+Epoch 002 | train loss 2.6135 acc 0.571 fooled 0.561 | val loss 0.8538 acc 0.589 fooled 0.576 not-fooled 0.597 score 0.587 | test acc 0.595 fooled 0.576
+Epoch 003 | train loss 1.9849 acc 0.588 fooled 0.584 | val loss 0.8499 acc 0.572 fooled 0.538 not-fooled 0.593 score 0.568 | test acc 0.565 fooled 0.529
+Epoch 004 | train loss 1.6146 acc 0.606 fooled 0.613 | val loss 0.8435 acc 0.603 fooled 0.557 not-fooled 0.632 score 0.598 | test acc 0.595 fooled 0.558
+Epoch 005 | train loss 1.2415 acc 0.634 fooled 0.637 | val loss 0.8402 acc 0.587 fooled 0.557 not-fooled 0.605 score 0.583 | test acc 0.591 fooled 0.587
+Epoch 006 | train loss 1.0417 acc 0.644 fooled 0.662 | val loss 0.8478 acc 0.603 fooled 0.563 not-fooled 0.628 score 0.599 | test acc 0.582 fooled 0.552
+Epoch 007 | train loss 1.0114 acc 0.639 fooled 0.655 | val loss 0.8459 acc 0.587 fooled 0.570 not-fooled 0.597 score 0.585 | test acc 0.582 fooled 0.570
+Epoch 008 | train loss 0.9741 acc 0.647 fooled 0.664 | val loss 0.8365 acc 0.577 fooled 0.551 not-fooled 0.593 score 0.574 | test acc 0.601 fooled 0.581
+Epoch 009 | train loss 0.9699 acc 0.639 fooled 0.656 | val loss 0.8471 acc 0.584 fooled 0.563 not-fooled 0.597 score 0.582 | test acc 0.584 fooled 0.576
+Epoch 010 | train loss 0.9084 acc 0.671 fooled 0.688 | val loss 0.8514 acc 0.575 fooled 0.532 not-fooled 0.601 score 0.570 | test acc 0.584 fooled 0.564
+Epoch 011 | train loss 0.8936 acc 0.664 fooled 0.683 | val loss 0.8436 acc 0.579 fooled 0.563 not-fooled 0.589 score 0.577 | test acc 0.597 fooled 0.570
+Epoch 012 | train loss 0.8863 acc 0.656 fooled 0.677 | val loss 0.8422 acc 0.587 fooled 0.582 not-fooled 0.589 score 0.586 | test acc 0.603 fooled 0.593
+Epoch 013 | train loss 0.9054 acc 0.655 fooled 0.691 | val loss 0.8344 acc 0.596 fooled 0.570 not-fooled 0.612 score 0.593 | test acc 0.593 fooled 0.599
+Epoch 014 | train loss 0.8667 acc 0.680 fooled 0.697 | val loss 0.8386 acc 0.577 fooled 0.557 not-fooled 0.589 score 0.575 | test acc 0.595 fooled 0.587
+Epoch 015 | train loss 0.8584 acc 0.670 fooled 0.693 | val loss 0.8346 acc 0.606 fooled 0.582 not-fooled 0.620 score 0.603 | test acc 0.593 fooled 0.576
+Epoch 016 | train loss 0.8627 acc 0.671 fooled 0.702 | val loss 0.8418 acc 0.599 fooled 0.557 not-fooled 0.624 score 0.594 | test acc 0.589 fooled 0.564
+Epoch 017 | train loss 0.8542 acc 0.675 fooled 0.708 | val loss 0.8362 acc 0.599 fooled 0.582 not-fooled 0.609 score 0.597 | test acc 0.603 fooled 0.610
+Epoch 018 | train loss 0.8389 acc 0.677 fooled 0.715 | val loss 0.8316 acc 0.599 fooled 0.582 not-fooled 0.609 score 0.597 | test acc 0.599 fooled 0.622
+Epoch 019 | train loss 0.8369 acc 0.688 fooled 0.717 | val loss 0.8369 acc 0.601 fooled 0.595 not-fooled 0.605 score 0.600 | test acc 0.586 fooled 0.610
+Epoch 020 | train loss 0.8463 acc 0.687 fooled 0.716 | val loss 0.8454 acc 0.596 fooled 0.570 not-fooled 0.612 score 0.593 | test acc 0.593 fooled 0.610
+Epoch 021 | train loss 0.8285 acc 0.677 fooled 0.722 | val loss 0.8575 acc 0.589 fooled 0.551 not-fooled 0.612 score 0.584 | test acc 0.593 fooled 0.628
+Epoch 022 | train loss 0.8223 acc 0.691 fooled 0.732 | val loss 0.8480 acc 0.591 fooled 0.563 not-fooled 0.609 score 0.588 | test acc 0.608 fooled 0.634
+Epoch 023 | train loss 0.7943 acc 0.720 fooled 0.766 | val loss 0.8512 acc 0.591 fooled 0.576 not-fooled 0.601 score 0.590 | test acc 0.608 fooled 0.640
+Epoch 024 | train loss 0.8011 acc 0.725 fooled 0.771 | val loss 0.8455 acc 0.591 fooled 0.570 not-fooled 0.605 score 0.589 | test acc 0.608 fooled 0.634
+Epoch 025 | train loss 0.8165 acc 0.708 fooled 0.750 | val loss 0.8628 acc 0.591 fooled 0.595 not-fooled 0.589 score 0.592 | test acc 0.584 fooled 0.616
+Epoch 026 | train loss 0.7898 acc 0.720 fooled 0.770 | val loss 0.8555 acc 0.579 fooled 0.595 not-fooled 0.570 score 0.581 | test acc 0.597 fooled 0.645
+Epoch 027 | train loss 0.7915 acc 0.724 fooled 0.767 | val loss 0.8665 acc 0.584 fooled 0.576 not-fooled 0.589 score 0.583 | test acc 0.612 fooled 0.634
+Epoch 028 | train loss 0.7794 acc 0.731 fooled 0.776 | val loss 0.8700 acc 0.591 fooled 0.589 not-fooled 0.593 score 0.591 | test acc 0.584 fooled 0.634
+Epoch 029 | train loss 0.7825 acc 0.731 fooled 0.779 | val loss 0.8913 acc 0.603 fooled 0.620 not-fooled 0.593 score 0.605 | test acc 0.576 fooled 0.616
+Epoch 030 | train loss 0.7686 acc 0.741 fooled 0.781 | val loss 0.8821 acc 0.575 fooled 0.595 not-fooled 0.562 score 0.577 | test acc 0.603 fooled 0.645
+Epoch 031 | train loss 0.7878 acc 0.725 fooled 0.773 | val loss 0.8784 acc 0.567 fooled 0.582 not-fooled 0.558 score 0.569 | test acc 0.595 fooled 0.634
+Epoch 032 | train loss 0.7699 acc 0.741 fooled 0.800 | val loss 0.9021 acc 0.596 fooled 0.620 not-fooled 0.581 score 0.599 | test acc 0.591 fooled 0.616
+Epoch 033 | train loss 0.7553 acc 0.743 fooled 0.786 | val loss 0.9042 acc 0.584 fooled 0.582 not-fooled 0.585 score 0.584 | test acc 0.599 fooled 0.616
+Epoch 034 | train loss 0.7658 acc 0.735 fooled 0.786 | val loss 0.9111 acc 0.582 fooled 0.608 not-fooled 0.566 score 0.585 | test acc 0.593 fooled 0.628
+Epoch 035 | train loss 0.7564 acc 0.748 fooled 0.797 | val loss 0.9329 acc 0.567 fooled 0.570 not-fooled 0.566 score 0.568 | test acc 0.589 fooled 0.610
+Epoch 036 | train loss 0.7649 acc 0.743 fooled 0.791 | val loss 0.9177 acc 0.550 fooled 0.589 not-fooled 0.527 score 0.555 | test acc 0.576 fooled 0.605
+Epoch 037 | train loss 0.7542 acc 0.755 fooled 0.805 | val loss 0.9288 acc 0.582 fooled 0.608 not-fooled 0.566 score 0.585 | test acc 0.589 fooled 0.605
+Epoch 038 | train loss 0.7423 acc 0.751 fooled 0.785 | val loss 0.9388 acc 0.584 fooled 0.582 not-fooled 0.585 score 0.584 | test acc 0.595 fooled 0.599
+Epoch 039 | train loss 0.7463 acc 0.748 fooled 0.802 | val loss 0.9193 acc 0.575 fooled 0.582 not-fooled 0.570 score 0.575 | test acc 0.580 fooled 0.599
+Epoch 040 | train loss 0.7341 acc 0.750 fooled 0.784 | val loss 0.9466 acc 0.572 fooled 0.589 not-fooled 0.562 score 0.574 | test acc 0.572 fooled 0.587
+Epoch 041 | train loss 0.7256 acc 0.766 fooled 0.815 | val loss 0.9362 acc 0.567 fooled 0.601 not-fooled 0.547 score 0.571 | test acc 0.580 fooled 0.599
+Epoch 042 | train loss 0.7062 acc 0.779 fooled 0.828 | val loss 1.0140 acc 0.565 fooled 0.557 not-fooled 0.570 score 0.564 | test acc 0.582 fooled 0.587
+Epoch 043 | train loss 0.7092 acc 0.778 fooled 0.822 | val loss 1.0175 acc 0.582 fooled 0.570 not-fooled 0.589 score 0.580 | test acc 0.582 fooled 0.593
+Epoch 044 | train loss 0.7237 acc 0.774 fooled 0.832 | val loss 1.0118 acc 0.575 fooled 0.589 not-fooled 0.566 score 0.576 | test acc 0.584 fooled 0.599
+Early stopping after 44 epochs (no val score improvement for 15 epochs).
+Finished in 35.4 min. Best checkpoint: outputs/iter5_time_head/best_reward_model.pt

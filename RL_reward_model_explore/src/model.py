@@ -229,7 +229,7 @@ class GINRewardModelFPMultiTask(GINRewardModelFP):
         )
 
     def predict_time(self, data) -> Tensor:
-        return self.time_head(self.encode_fused(data)).squeeze(-1)
+        return self.time_head(self.encode_fused(data)).reshape(())
 
 
 class _GradientReversalFn(torch.autograd.Function):
@@ -282,7 +282,7 @@ class GINRewardModelMultiTask(GINRewardModel):
         )
 
     def predict_time(self, data) -> Tensor:
-        return self.time_head(self.encode_fused(data)).squeeze(-1)
+        return self.time_head(self.encode_fused(data)).reshape(())
 
 
 class GINRewardModelAdv(GINRewardModel):
