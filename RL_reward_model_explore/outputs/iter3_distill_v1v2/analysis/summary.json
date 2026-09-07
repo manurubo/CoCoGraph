@@ -1,0 +1,160 @@
+{
+  "n_pairs": 4494,
+  "overall_accuracy": 0.5378282153983088,
+  "model_prefers_generated_rate": 0.6214953271028038,
+  "human_fooled_rate": 0.3693813974187806,
+  "model_agrees_with_human_rate": 0.5378282153983088,
+  "mean_reward_real": 0.04594303547182134,
+  "mean_reward_generated": 0.15882652994323213,
+  "mean_score_diff": 0.03461992151580973,
+  "mean_abs_score_diff": 0.27241842035563935,
+  "by_split": {
+    "test": {
+      "n": 474,
+      "accuracy": 0.5042,
+      "agree_human": 0.5042,
+      "fooled_rate": 0.3629,
+      "pref_gen_rate": 0.5928,
+      "mean_reward_real": 0.0689,
+      "mean_reward_generated": 0.159
+    },
+    "train": {
+      "n": 3604,
+      "accuracy": 0.5405,
+      "agree_human": 0.5405,
+      "fooled_rate": 0.369,
+      "pref_gen_rate": 0.626,
+      "mean_reward_real": 0.0403,
+      "mean_reward_generated": 0.1597
+    },
+    "val": {
+      "n": 416,
+      "accuracy": 0.5529,
+      "agree_human": 0.5529,
+      "fooled_rate": 0.3798,
+      "pref_gen_rate": 0.6154,
+      "mean_reward_real": 0.0683,
+      "mean_reward_generated": 0.1512
+    }
+  },
+  "by_human_fooled": {
+    "0": {
+      "n": 2834,
+      "accuracy": 0.4337,
+      "mean_score_diff": -0.0621,
+      "mean_prob_preferred": 0.485
+    },
+    "1": {
+      "n": 1660,
+      "accuracy": 0.7157,
+      "mean_score_diff": 0.1997,
+      "mean_prob_preferred": 0.5484
+    }
+  },
+  "by_biochemistry_level": {
+    "GR": {
+      "n": 1779,
+      "accuracy": 0.5419,
+      "fooled_rate": 0.3367,
+      "pref_gen_rate": 0.6318
+    },
+    "HS": {
+      "n": 654,
+      "accuracy": 0.5703,
+      "fooled_rate": 0.37,
+      "pref_gen_rate": 0.5856
+    },
+    "PH": {
+      "n": 473,
+      "accuracy": 0.5222,
+      "fooled_rate": 0.3869,
+      "pref_gen_rate": 0.5899
+    },
+    "UG": {
+      "n": 1588,
+      "accuracy": 0.5246,
+      "fooled_rate": 0.4005,
+      "pref_gen_rate": 0.6341
+    }
+  },
+  "by_expert_weight": {
+    "0.5": {
+      "n": 1127,
+      "accuracy": 0.5501,
+      "fooled_rate": 0.3771
+    },
+    "0.8": {
+      "n": 1588,
+      "accuracy": 0.5246,
+      "fooled_rate": 0.4005
+    },
+    "1.0": {
+      "n": 1779,
+      "accuracy": 0.5419,
+      "fooled_rate": 0.3367
+    }
+  },
+  "fooled_eval": {
+    "description": "Metrics when human was fooled (preferred generated over real).",
+    "n_fooled_pairs": 1660,
+    "n_not_fooled_pairs": 2834,
+    "overall_accuracy": 0.5378282153983088,
+    "fooled_subset": {
+      "pairwise_accuracy": 0.7156626506024096,
+      "model_prefers_generated_rate": 0.7156626506024096,
+      "model_ranks_generated_above_real_rate": 0.7156626506024096,
+      "mean_reward_generated": 0.18470356297421167,
+      "mean_reward_real": -0.014959189758063799,
+      "mean_margin_gen_minus_real": 0.1996627527322755,
+      "mean_score_diff": 0.1996627540451037,
+      "mean_prob_preferred": 0.5484380526176418,
+      "by_split": {
+        "test": {
+          "n": 172,
+          "pairwise_accuracy": 0.6337,
+          "ranks_gen_above_real": 0.6337,
+          "mean_margin_gen_minus_real": 0.1324
+        },
+        "train": {
+          "n": 1330,
+          "pairwise_accuracy": 0.7256,
+          "ranks_gen_above_real": 0.7256,
+          "mean_margin_gen_minus_real": 0.2166
+        },
+        "val": {
+          "n": 158,
+          "pairwise_accuracy": 0.7215,
+          "ranks_gen_above_real": 0.7215,
+          "mean_margin_gen_minus_real": 0.1305
+        }
+      },
+      "by_biochemistry_level": {
+        "GR": {
+          "n": 599,
+          "pairwise_accuracy": 0.7579,
+          "ranks_gen_above_real": 0.7579
+        },
+        "HS": {
+          "n": 242,
+          "pairwise_accuracy": 0.7107,
+          "ranks_gen_above_real": 0.7107
+        },
+        "PH": {
+          "n": 183,
+          "pairwise_accuracy": 0.6448,
+          "ranks_gen_above_real": 0.6448
+        },
+        "UG": {
+          "n": 636,
+          "pairwise_accuracy": 0.6981,
+          "ranks_gen_above_real": 0.6981
+        }
+      }
+    },
+    "not_fooled_subset": {
+      "pairwise_accuracy": 0.43366266760762173,
+      "model_prefers_generated_rate": 0.5663373323923783,
+      "mean_margin_gen_minus_real": 0.06205301856702284
+    }
+  }
+}

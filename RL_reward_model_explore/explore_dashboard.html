@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CoCoGraph reward-model exploration</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2330;
+      --panel-2: #243044;
+      --text: #e8eef6;
+      --muted: #9aa8b8;
+      --line: #314156;
+      --accent: #6cb6ff;
+      --good: #3ecf8e;
+      --bad: #f07178;
+      --warn: #e6c07b;
+      --pending: #8b9bb0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    header {
+      padding: 28px 32px 16px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(180deg, #182232 0%, var(--bg) 100%);
+    }
+    h1 { margin: 0 0 6px; font-size: 1.55rem; font-weight: 650; }
+    h2 { margin: 28px 0 12px; font-size: 1.15rem; }
+    h3 { margin: 0 0 8px; font-size: 1.02rem; }
+    .sub { color: var(--muted); max-width: 920px; }
+    main { padding: 12px 32px 48px; max-width: 1200px; }
+    .rec {
+      background: #1d3a2a;
+      border: 1px solid #2f6b4d;
+      border-radius: 12px;
+      padding: 16px 18px;
+      margin: 18px 0;
+    }
+    .rec.warn { background: #3a3220; border-color: #7a6430; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--panel);
+      border-radius: 10px;
+      overflow: hidden;
+      font-size: 0.92rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th { background: var(--panel-2); font-weight: 600; color: #d5e2f0; }
+    tr:last-child td { border-bottom: 0; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 650;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .pending { background: #2b3646; color: var(--pending); }
+    .running { background: #1d3f66; color: var(--accent); }
+    .kept { background: #1b4a34; color: var(--good); }
+    .dropped { background: #5a2428; color: #ffb4b8; }
+    .component { background: #4a3c1d; color: var(--warn); }
+    .iter {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px 18px;
+      margin: 16px 0 24px;
+    }
+    .meta { color: var(--muted); font-size: 0.88rem; }
+    code, .path {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.84em;
+      background: #0c1117;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+    pre {
+      background: #0c1117;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      overflow-x: auto;
+      font-size: 0.8rem;
+      color: #d7e3f0;
+    }
+    .up { color: var(--good); font-weight: 650; }
+    .down { color: var(--bad); font-weight: 650; }
+    .same { color: var(--muted); }
+    footer { color: var(--muted); font-size: 0.82rem; padding: 0 32px 32px; }
+    @media (max-width: 860px) { main, header { padding-left: 16px; padding-right: 16px; } }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Reward-model exploration dashboard</h1>
+  <p class="sub">
+    Copy of <code>RL_reward_model/</code> at <code>RL_reward_model_explore/</code>.
+    Three architectural / training-procedure iterations vs <strong>v2_improved_run</strong>.
+    Goal: better <em>held-out</em> pairwise accuracy (test fooled <em>and</em> not-fooled),
+    gen-bias closer to the human 37% fool rate, usable score range.
+    Original <code>RL_reward_model/</code> source was not modified.
+  </p>
+</header>
+<main>
+  <section class="rec warn" id="recommendation">
+    <h3>Current recommendation</h3>
+    <p><strong>Keep v2 as the production reward model.</strong> None of the three explore runs beat v2 on the joint goal (test accuracy + not-fooled + gen-bias) without losing fooled detection. Closest official checkpoint is iteration 1 epoch 1 (a slightly worse v2). Iteration 2’s unofficial epoch 12 had test 60.3% but was not selected by the v2 composite.</p>
+    <p><strong>If there is an iteration 4:</strong> do <em>not</em> add encoder/FP capacity. Change the <em>objective and checkpoint rule</em>: conservatism calibration toward the 37% human fool rate, a not-fooled hinge (two-sided ranking), and balanced checkpoint selection (overall + fooled + not-fooled). Across all three runs the 65% fooled composite is what saves the gen-biased snapshot.</p>
+  </section>
+
+  <h2>Plan</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Idea</th>
+        <th>Status</th>
+        <th>One-line verdict</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>A. Morgan FP fusion</strong> (GINE ⊕ radius-3 2048-bit FP)</td>
+        <td><span class="badge dropped">dropped</span></td>
+        <td>Iter 1: 1.2M FP MLP memorized train. Epoch-1 ckpt ≈ worse v2.</td>
+      </tr>
+      <tr>
+        <td><strong>B. Conservatism calibration + two-sided ranking</strong></td>
+        <td><span class="badge pending">pending</span></td>
+        <td>Best next step — attacks 54% vs 37% gen-bias; not tried in these 3 iters.</td>
+      </tr>
+      <tr>
+        <td><strong>C. Distill v1 + v2 into one student</strong></td>
+        <td><span class="badge dropped">dropped</span></td>
+        <td>Iter 3: not-fooled 43% (below chance), prefers-gen 62%.</td>
+      </tr>
+      <tr>
+        <td><strong>D. Dual-head multi-task (BT + time)</strong></td>
+        <td><span class="badge pending">pending</span></td>
+        <td>Not tried. Time head could regularize encoder if checkpoint rule is fixed first.</td>
+      </tr>
+      <tr>
+        <td><strong>E. Player-adversarial / IRM-lite</strong></td>
+        <td><span class="badge pending">pending</span></td>
+        <td>Not tried. Aimed at player_id leakage (train 73% → test 57% in v2).</td>
+      </tr>
+      <tr>
+        <td><strong>F. Frozen encoder + small fused head</strong></td>
+        <td><span class="badge dropped">dropped</span></td>
+        <td>Iter 2: freeze does not stop pair memorization over unique embeddings.</td>
+      </tr>
+      <tr>
+        <td><strong>G. Pair mixup</strong></td>
+        <td><span class="badge pending">pending</span></td>
+        <td>Skipped — chemically dubious; lower priority than B/E.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Scoreboard vs v2 (official best checkpoints)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>v2</th>
+        <th>v1 weighted</th>
+        <th>Iter 1 FP</th>
+        <th>Iter 2 freeze+small</th>
+        <th>Iter 3 distill</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Overall</td><td>69.7%</td><td>69.8%</td><td>66.9%</td><td>67.0%</td><td>53.8%</td></tr>
+      <tr><td>Test</td><td>56.5%</td><td>67.5%</td><td>55.1%</td><td>54.8%</td><td>50.4%</td></tr>
+      <tr><td>Fooled (all)</td><td>81.8%</td><td>49.0%</td><td>81.6%</td><td>80.6%</td><td>71.6%</td></tr>
+      <tr><td>Fooled test</td><td>65.7%</td><td>43.0%</td><td>65.7%</td><td>66.9%</td><td>63.4%</td></tr>
+      <tr><td>Not-fooled</td><td>62.6%</td><td>81.9%</td><td>58.3%</td><td>59.0%</td><td>43.4%</td></tr>
+      <tr><td>Prefers generated (human 37%)</td><td>53.8%</td><td>29.5%</td><td>56.4%</td><td>55.6%</td><td>62.1%</td></tr>
+      <tr><td>Mean |score diff|</td><td>0.094</td><td>larger</td><td>0.142</td><td>0.145</td><td>0.272</td></tr>
+      <tr><td>Decision</td><td>baseline</td><td>—</td><td>drop</td><td>drop</td><td>drop</td></tr>
+    </tbody>
+  </table>
+
+  <h2>v2 baseline (what we were trying to fix)</h2>
+  <table>
+    <thead>
+      <tr><th>Metric</th><th>v2</th><th>v1 weighted</th><th>Target direction</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Overall</td><td>69.7%</td><td>69.8%</td><td>secondary</td></tr>
+      <tr><td>Test</td><td>56.5%</td><td>67.5%</td><td>raise</td></tr>
+      <tr><td>Fooled (all)</td><td>81.8%</td><td>49.0%</td><td>keep ≥70%</td></tr>
+      <tr><td>Fooled test</td><td>65.7%</td><td>43.0%</td><td>raise or hold ≥60%</td></tr>
+      <tr><td>Fooled train</td><td>~86%</td><td>—</td><td>not a success metric</td></tr>
+      <tr><td>Not-fooled</td><td>62.6%</td><td>81.9%</td><td>raise</td></tr>
+      <tr><td>Prefers generated</td><td>53.8%</td><td>29.5%</td><td>toward human 37%</td></tr>
+      <tr><td>Mean |score diff|</td><td>~0.094</td><td>larger</td><td>wider for RL</td></tr>
+    </tbody>
+  </table>
+
+  <article class="iter" id="iter1">
+    <h2>Iteration 1 — Morgan fingerprint fusion</h2>
+    <p class="meta">2026-09-07 16:15–16:30 CEST · idea A · <span class="badge dropped">dropped</span> (keep-as-component: fusion only)</p>
+    <p><strong>Why this first.</strong> Highest-leverage architecture change already hinted in the original README. Complements GINE with substructure identity, stays a scalar scorer for RL, does not retune <code>FOOLED_LOSS_WEIGHT</code>.</p>
+    <p><strong>What changed:</strong> <code>src/fingerprints.py</code>, <code>GINRewardModelFP</code> (2048→512→256 MLP, concat-fuse), architecture-aware <code>load_reward_model</code>. Same data, player_id split, fooled sampler/margin/weights, time-encoder init.</p>
+    <p><strong>Train command</strong></p>
+    <pre>python scripts/train_reward_model.py \
+  --model-type gin_fp \
+  --output-dir outputs/iter1_gin_fp \
+  --cache-dir RL_reward_model/outputs/smoke_test/feature_cache \
+  --epochs 80</pre>
+    <p class="meta">GPU RTX 4090 · 16 epochs · wall 15.1 min · early-stopped. Best = epoch 1 (val composite 0.604). Epoch 12+ train fooled = 100%, val fooled ≈ 40%.</p>
+    <table>
+      <thead>
+        <tr><th>Metric</th><th>v2</th><th>Iter 1 (best=ep1)</th><th>Delta</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Overall</td><td>69.7%</td><td>66.9%</td><td class="down">−2.8</td></tr>
+        <tr><td>Test</td><td>56.5%</td><td>55.1%</td><td class="down">−1.4</td></tr>
+        <tr><td>Fooled (all)</td><td>81.8%</td><td>81.6%</td><td class="same">−0.2</td></tr>
+        <tr><td>Fooled test</td><td>65.7%</td><td>65.7%</td><td class="same">0.0</td></tr>
+        <tr><td>Not-fooled</td><td>62.6%</td><td>58.3%</td><td class="down">−4.3</td></tr>
+        <tr><td>Prefers generated</td><td>53.8%</td><td>56.4%</td><td class="down">farther from 37%</td></tr>
+        <tr><td>Mean |score diff|</td><td>0.094</td><td>0.142</td><td class="up">wider</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Criticism.</strong> Extra ~1.2M unfrozen FP weights memorized the 3.6k training pairs before fingerprints could act as a regularizer. Epoch 1 is pretrained GINE + a barely trained FP MLP — noisy v2 with slightly more score spread. Not-fooled and gen-bias moved the wrong way.</p>
+    <p><strong>Decision: drop</strong> the unfrozen large-MLP path. Keep fusion only with a small frozen-encoder head (iteration 2).</p>
+    <p class="meta">Checkpoint: <code>outputs/iter1_gin_fp/best_reward_model.pt</code> · analysis: <code>outputs/iter1_gin_fp/analysis/</code></p>
+  </article>
+
+  <article class="iter" id="iter2">
+    <h2>Iteration 2 — Frozen encoder + small FP head</h2>
+    <p class="meta">2026-09-07 16:32–16:42 CEST · idea F · <span class="badge dropped">dropped</span></p>
+    <p><strong>Why this next.</strong> Iter 1 failed by capacity. Freeze the time-model GINE and train only a 2048→64 bottleneck + fused reward head (141k trainable / 204k total).</p>
+    <p><strong>What changed:</strong> <code>GINRewardModelFPSmall</code>, <code>--freeze-encoder</code>.</p>
+    <p><strong>Train command</strong></p>
+    <pre>python scripts/train_reward_model.py \
+  --model-type gin_fp_small \
+  --freeze-encoder \
+  --output-dir outputs/iter2_frozen_fp_small \
+  --cache-dir RL_reward_model/outputs/smoke_test/feature_cache \
+  --epochs 80</pre>
+    <p class="meta">GPU RTX 4090 · 18 epochs · wall 9.4 min · best = epoch 3 (v2 composite 0.602). Train still reached ~91% / fooled 94% because unique frozen embeddings identify molecules.</p>
+    <table>
+      <thead>
+        <tr><th>Metric</th><th>v2</th><th>Iter 2 (ep3)</th><th>Delta</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Overall</td><td>69.7%</td><td>67.0%</td><td class="down">−2.7</td></tr>
+        <tr><td>Test</td><td>56.5%</td><td>54.8%</td><td class="down">−1.7</td></tr>
+        <tr><td>Fooled (all)</td><td>81.8%</td><td>80.6%</td><td class="down">−1.2</td></tr>
+        <tr><td>Fooled test</td><td>65.7%</td><td>66.9%</td><td class="up">+1.2</td></tr>
+        <tr><td>Not-fooled</td><td>62.6%</td><td>59.0%</td><td class="down">−3.6</td></tr>
+        <tr><td>Prefers generated</td><td>53.8%</td><td>55.6%</td><td class="down">farther from 37%</td></tr>
+        <tr><td>Mean |score diff|</td><td>0.094</td><td>0.145</td><td class="up">wider</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Criticism.</strong> Freezing the encoder does not prevent a lookup table over unique molecule embeddings. The v2 composite (65% fooled) again selected the most fooled-overfit epoch (val not-fooled 48.8%). Epoch 12 had test 60.3% / fooled test 57.6% — closer to the goal, but that is not the saved checkpoint. A +1pp fooled-test bump does not offset worse test overall, worse not-fooled, and worse gen-bias.</p>
+    <p><strong>Decision: drop</strong> as a standalone model. Lesson: change the <em>target and checkpoint rule</em>, not just parameter count.</p>
+    <p class="meta">Checkpoint: <code>outputs/iter2_frozen_fp_small/best_reward_model.pt</code> · analysis: <code>outputs/iter2_frozen_fp_small/analysis/</code></p>
+  </article>
+
+  <article class="iter" id="iter3">
+    <h2>Iteration 3 — Distill v1 + v2 into original GIN</h2>
+    <p class="meta">2026-09-07 16:45–16:58 CEST · idea C · <span class="badge dropped">dropped</span></p>
+    <p><strong>Why this next.</strong> Two encoder/capacity experiments failed the same way. v1 already has test 67.5% / not-fooled 82%; v2 has fooled 82%. Soft-combining their <code>r_pref−r_rej</code> logits changes supervision without adding a memorization MLP.</p>
+    <p><strong>What changed:</strong> distillation loss (<code>--distill-weight 1.0 --distill-alpha 0.5 --distill-temperature 2.0</code>). Teachers are read-only original checkpoints. First launch failed (v1 reward-head index remap + student logit shape); both bugs fixed and training completed.</p>
+    <p><strong>Train command</strong></p>
+    <pre>python scripts/train_reward_model.py \
+  --model-type gin \
+  --distill-weight 1.0 \
+  --distill-alpha 0.5 \
+  --distill-temperature 2.0 \
+  --output-dir outputs/iter3_distill_v1v2 \
+  --cache-dir RL_reward_model/outputs/smoke_test/feature_cache \
+  --epochs 80</pre>
+    <p class="meta">GPU RTX 4090 · 18 epochs · wall 11.1 min (plus ~1 min of failed launches) · best = epoch 3 (val composite 0.662, “better” than v2’s 0.626).</p>
+    <table>
+      <thead>
+        <tr><th>Metric</th><th>v2</th><th>Iter 3 (ep3)</th><th>Delta</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Overall</td><td>69.7%</td><td>53.8%</td><td class="down">−15.9</td></tr>
+        <tr><td>Test</td><td>56.5%</td><td>50.4%</td><td class="down">−6.1</td></tr>
+        <tr><td>Fooled (all)</td><td>81.8%</td><td>71.6%</td><td class="down">−10.2</td></tr>
+        <tr><td>Fooled test</td><td>65.7%</td><td>63.4%</td><td class="down">−2.3</td></tr>
+        <tr><td>Not-fooled</td><td>62.6%</td><td>43.4%</td><td class="down">−19.2 (below chance)</td></tr>
+        <tr><td>Prefers generated</td><td>53.8%</td><td>62.1%</td><td class="down">farther from 37%</td></tr>
+        <tr><td>Mean |score diff|</td><td>0.094</td><td>0.272</td><td class="up">wider, but biased</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Criticism.</strong> Averaging v1 and v2 logits did not transfer v1’s conservatism. The student inherited v2’s gen preference and the checkpoint rule rewarded it (val fooled 72%). Not-fooled collapsed below chance. Wider score range is useless if the sign is systematically wrong on easy real-vs-fake pairs. Soft labels without a calibration prior just smear two incompatible biases.</p>
+    <p><strong>Decision: drop.</strong></p>
+    <p class="meta">Checkpoint: <code>outputs/iter3_distill_v1v2/best_reward_model.pt</code> · analysis: <code>outputs/iter3_distill_v1v2/analysis/</code><br>
+    Teachers (read-only): <code>RL_reward_model/outputs/full_run_weighted/best_reward_model.pt</code>, <code>RL_reward_model/outputs/v2_improved_run/best_reward_model.pt</code></p>
+  </article>
+
+  <h2>What we learned (for iteration 4)</h2>
+  <ul>
+    <li>More capacity (large Morgan MLP) overfits Turing pairs in a few epochs.</li>
+    <li>Freezing GINE does not stop memorization: embeddings already uniquely identify molecules.</li>
+    <li>The v2 checkpoint composite (65% fooled + 35% overall) consistently selects the gen-biased snapshot. Iter 2 epoch 12 (test 60.3%) was discarded by this rule.</li>
+    <li>Distilling v1+v2 without a 37% prior made gen-bias worse, not better.</li>
+    <li>Score range did widen (0.09 → 0.14–0.27) in all three runs — that part is easy and not sufficient.</li>
+  </ul>
+
+  <h2>Paths</h2>
+  <ul>
+    <li>Explore root: <code>/export/home/shared/Projects/Manu22-23/MoleculeDifusion/CoCoGraph/RL_reward_model_explore</code></li>
+    <li>This dashboard: <code>explore_dashboard.html</code></li>
+    <li>Plan: <code>PLAN.md</code></li>
+    <li>Original (read-only source): <code>../RL_reward_model/</code></li>
+    <li>v2 baseline checkpoint: <code>../RL_reward_model/outputs/v2_improved_run/best_reward_model.pt</code></li>
+    <li>Feature cache (read-only): <code>../RL_reward_model/outputs/smoke_test/feature_cache</code></li>
+    <li>Iter 1: <code>outputs/iter1_gin_fp/</code></li>
+    <li>Iter 2: <code>outputs/iter2_frozen_fp_small/</code></li>
+    <li>Iter 3: <code>outputs/iter3_distill_v1v2/</code></li>
+  </ul>
+</main>
+<footer>Self-contained dashboard · three iterations complete · no training still running · no CDN</footer>
+</body>
+</html>
