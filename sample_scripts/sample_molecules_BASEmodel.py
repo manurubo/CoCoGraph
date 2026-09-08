@@ -213,8 +213,8 @@ if __name__ == "__main__":
 
     # try to load the models
     try:
-        checkpoint = torch.load(args.model_checkpoint_path)
-        checkpoint_time = torch.load(args.time_model_checkpoint_path)
+        checkpoint = torch.load(args.model_checkpoint_path, map_location=device)
+        checkpoint_time = torch.load(args.time_model_checkpoint_path, map_location=device)
     except FileNotFoundError:
         print(f"Error: Could not find model checkpoints at specified paths:")
         print(f"  Main model: {args.model_checkpoint_path}")

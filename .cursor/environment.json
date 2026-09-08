@@ -1,0 +1,4 @@
+{
+  "name": "CoCoGraph",
+  "install": "bash .cursor/install.sh"
+}

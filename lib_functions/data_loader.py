@@ -164,8 +164,9 @@ def build_dataset_alejandro(all_smiles, ftr=0.8, fva=0.1, bs=(NSTEP+1)*100, nste
     all_smiles_split = np.array_split(all_smiles, num_splits)
 
     import concurrent
+    import os
     futures = []
-    executor = concurrent.futures.ProcessPoolExecutor(max_workers=16)
+    executor = concurrent.futures.ProcessPoolExecutor(max_workers=min(16, os.cpu_count() or 1))
 
     for smiles_sm in all_smiles_split:
         future = executor.submit(parallel_preprocessing, smiles_sm, min_atom)
